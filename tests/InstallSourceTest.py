@@ -29,7 +29,7 @@ class InstallSourceTest(unittest.TestCase):
             self.assertEqual(pathlib.Path(spec), root.resolve())
 
         gitSpec = DirectoryInstallSource(
-            json.dumps({"url": "https://github.com/nuwainfo/agent-recorder-mcp.git", "vcs_info": {"vcs": "git"}})
+            json.dumps({"url": "https://github.com/company-notes/agent-recorder-mcp.git", "vcs_info": {"vcs": "git"}})
         ).directorySpec()
         self.assertIsNone(gitSpec)
 

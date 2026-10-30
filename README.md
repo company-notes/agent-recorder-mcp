@@ -14,7 +14,7 @@ Give the assistant one URL. Install the skill from tag `v0.1.0` first. The skill
 mkdir -p ~/.grok/skills/agent-session-recording
 curl -fsSL \
   -o ~/.grok/skills/agent-session-recording/SKILL.md \
-  https://raw.githubusercontent.com/nuwainfo/agent-recorder-mcp/v0.1.0/.grok/skills/agent-session-recording/SKILL.md
+  https://raw.githubusercontent.com/company-notes/agent-recorder-mcp/v0.1.0/.grok/skills/agent-session-recording/SKILL.md
 ```
 
 Claude uses `~/.claude/skills/agent-session-recording/SKILL.md`. The same file is the source for every assistant. `uv` selects Python 3.11 or newer when the skill installs the connector.

@@ -14,7 +14,7 @@ description: >
 Pinned source, tag `v0.1.0`:
 
 ```text
-git+https://github.com/nuwainfo/agent-recorder-mcp.git@v0.1.0
+git+https://github.com/company-notes/agent-recorder-mcp.git@v0.1.0
 ```
 
 Install and launch only that tag. Do not follow the default branch.
@@ -32,12 +32,12 @@ Adding a connector asks for approval. A FastFileLink share asks for approval. A 
 Add a custom connector. This is not the Grok Build config file.
 
 - Command: `uvx`
-- Args: `--from git+https://github.com/nuwainfo/agent-recorder-mcp.git@v0.1.0 agent-recorder-mcp`
+- Args: `--from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.1.0 agent-recorder-mcp`
 
 ### Claude Code
 
 ```bash
-claude mcp add-json agent-recorder --scope user "{\"command\":\"uvx\",\"args\":[\"--from\",\"git+https://github.com/nuwainfo/agent-recorder-mcp.git@v0.1.0\",\"agent-recorder-mcp\"]}"
+claude mcp add-json agent-recorder --scope user "{\"command\":\"uvx\",\"args\":[\"--from\",\"git+https://github.com/company-notes/agent-recorder-mcp.git@v0.1.0\",\"agent-recorder-mcp\"]}"
 ```
 
 ### Claude Desktop
@@ -47,7 +47,7 @@ Add this entry to `claude_desktop_config.json` under `mcpServers`:
 ```json
 "agent-recorder": {
   "command": "uvx",
-  "args": ["--from", "git+https://github.com/nuwainfo/agent-recorder-mcp.git@v0.1.0", "agent-recorder-mcp"]
+  "args": ["--from", "git+https://github.com/company-notes/agent-recorder-mcp.git@v0.1.0", "agent-recorder-mcp"]
 }
 ```
 
@@ -58,7 +58,7 @@ Add this block to `~/.codex/config.toml`:
 ```toml
 [mcp_servers.agent-recorder]
 command = "uvx"
-args = ["--from", "git+https://github.com/nuwainfo/agent-recorder-mcp.git@v0.1.0", "agent-recorder-mcp"]
+args = ["--from", "git+https://github.com/company-notes/agent-recorder-mcp.git@v0.1.0", "agent-recorder-mcp"]
 ```
 
 ### Cursor

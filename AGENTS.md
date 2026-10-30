@@ -28,7 +28,7 @@ Display selection must fail with `No active agent display could be identified.` 
 People install the skill from tag `v0.1.0`. The skill installs the MCP connector and pins that same tag. Grok Bot adds a custom connector. `install --target grok-build` is only for Grok Build's `~/.grok/config.toml`.
 
 ```text
-uvx --from git+https://github.com/nuwainfo/agent-recorder-mcp.git@v0.1.0 agent-recorder-mcp
+uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.1.0 agent-recorder-mcp
 ```
 
 Tests on this machine use the `recoding-mcp` conda environment:
