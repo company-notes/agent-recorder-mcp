@@ -1,13 +1,12 @@
 ---
 name: agent-session-recording
-description: >
+description: >-
   Install and configure the agent-recorder MCP from this skill, then record the
   agent's own browser/computer-use session and return a replay link. Use when
-  the user shares this skill to set up recording, requests installation,
-  asks for a replay, or wants browser/computer UI work recorded. If the
-  recording tools are missing, set up the MCP connector before recording.
+  the user shares this skill to set up recording, requests installation, asks
+  for a replay, or wants browser/computer UI work recorded. If the recording
+  tools are missing, set up the MCP connector before recording.
 ---
-
 # Agent session recording
 
 **This skill is the installation entry point.** When a user gives you this
@@ -50,10 +49,10 @@ MCP is not a prerequisite for installing or reading this skill.
 
 ### Pinned MCP source
 
-Install only `v0.2.1`, not an unpinned default branch:
+Install only `v0.2.2`, not an unpinned default branch:
 
 ```text
-git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.1
+git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2
 ```
 
 Common stdio MCP connector entry:
@@ -63,7 +62,7 @@ Common stdio MCP connector entry:
   "command": "uvx",
   "args": [
     "--from",
-    "git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.1",
+    "git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2",
     "agent-recorder-mcp"
   ]
 }
@@ -72,23 +71,23 @@ Common stdio MCP connector entry:
 ### Agent-specific connector installation
 
 - **Grok Bot:** Use its **custom connector** setup with command `uvx`
-  and arguments `--from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.1 agent-recorder-mcp`.
+  and arguments `--from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2 agent-recorder-mcp`.
   Grok Bot is **not** Grok Build. If its custom connector can only be
   managed through a user approval/UI unavailable to you, ask the user to
   approve or add the entry, then recheck the tools. Do not run the Grok
   Build installer for Grok Bot.
 - **Grok Build:** If shell access is available, run:
-  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.1 agent-recorder-mcp install --target grok-build`.
+  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2 agent-recorder-mcp install --target grok-build`.
   This writes the Grok Build MCP configuration, not the Grok Bot connector.
 - **Claude Code:** With shell access run:
-  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.1 agent-recorder-mcp install --target claude-code`.
+  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2 agent-recorder-mcp install --target claude-code`.
   Alternatively use `claude mcp add-json agent-recorder --scope user`
   with the stdio entry above.
 - **Claude Desktop:** Register the stdio entry under `mcpServers` in
   `claude_desktop_config.json`. Desktop skill availability is separate
   from its MCP configuration; follow the client's skill installation rules.
 - **Codex:** With shell access run:
-  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.1 agent-recorder-mcp install --target codex`.
+  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2 agent-recorder-mcp install --target codex`.
   Alternatively configure `[mcp_servers.agent-recorder]` in
   `~/.codex/config.toml` using `command = "uvx"` and corresponding `args`.
 - **Cursor:** Add the stdio entry under `mcpServers` in
@@ -108,7 +107,7 @@ require user approval. Respect every prompt.
 A user can share the canonical, versioned SKILL.md directly:
 
 ```text
-https://raw.githubusercontent.com/company-notes/agent-recorder-mcp/v0.2.1/skills/agent-session-recording/SKILL.md
+https://raw.githubusercontent.com/company-notes/agent-recorder-mcp/v0.2.2/skills/agent-session-recording/SKILL.md
 ```
 
 Start at **Bootstrap: Skill first, then MCP**. The user should not need
@@ -126,7 +125,12 @@ After the connector tools are verified:
    sharing needs no custom `outputDir`.
 2. Perform the user's task on the agent's own browser/computer.
 3. Call `finishRecording` after the last UI action.
-4. Include the returned replay `url` in the final response.
+4. Include the returned replay `url` in the final response, together with
+   a recording summary: the time span and duration, then a short numbered
+   list of what was done in the recording (key steps, accounts and systems
+   touched, anything created or changed, human help such as 2FA, and any
+   mistakes or detours and how they were fixed). Never put passwords,
+   codes or key contents in the summary.
 5. If recording fails, continue only if safe, and clearly state that no
    replay was produced and why.
 6. Do not record tasks without browser/computer UI unless explicitly asked.
@@ -155,6 +159,6 @@ FastFileLink replay if appropriate.
 
 Reply in the user's language. For setup requests, distinguish skill
 installation, MCP registration and actual tool availability. For recording
-requests, include the work result and the replay URL, or state why no
+requests, include the work result, the replay URL and its recording summary, or state why no
 replay exists. Never imply that installing a skill alone bypasses agent
 permission controls or enables unsupported X11 capture.
