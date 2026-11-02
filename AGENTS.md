@@ -12,7 +12,7 @@
 - `src/agent_recorder/NetworkProfile.py` — bounded synthetic-DNS detection and FFL transport selection.
 - `src/agent_recorder/Cleanup.py` — delete after FFL's `completed` event.
 - `src/agent_recorder/Store.py` — snake_case JSON metadata on disk.
-- `skills/agent-session-recording/SKILL.md` — vendor-neutral recording skill source.
+- `skills/agent-session-recording/SKILL.md` — vendor-neutral recording skill and required replay summary.
 - `src/agent_recorder/SkillInstall.py` — installs the same skill to supported agents.
 
 ## Rules
@@ -29,10 +29,10 @@ FFL delivery uses `FFLNetworkProfile` to detect managed sandbox DNS and select w
 
 ## Commands
 
-Version 0.2.1 uses the `v0.2.1` source ref. Share the versioned `skills/agent-session-recording/SKILL.md` URL as the canonical onboarding link; the skill drives MCP registration and verifies tool discovery. Do not require an MCP installation before accepting the skill. The common skill is installed into Grok, Claude Code, Codex, Cursor or Copilot directories via `install-skill`; `install --target` installs it alongside supported MCP clients. Grok Bot and Cursor need separate connector registration. Existing skills are not overwritten without `--overwrite`.
+Version 0.2.2 uses the `v0.2.2` release ref. Share the versioned `skills/agent-session-recording/SKILL.md` URL as the canonical onboarding link; the skill drives MCP registration and verifies tool discovery. Do not require an MCP installation before accepting the skill. The common skill is installed into Grok, Claude Code, Codex, Cursor or Copilot directories via `install-skill`; `install --target` installs it alongside supported MCP clients. Grok Bot and Cursor need separate connector registration. Existing skills are not overwritten without `--overwrite`.
 
 ```text
-uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.1 agent-recorder-mcp
+uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2 agent-recorder-mcp
 ```
 
 Tests on this machine use the `recoding-mcp` conda environment:
