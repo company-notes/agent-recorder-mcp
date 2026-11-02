@@ -29,12 +29,12 @@ class AppPaths:
 
     @staticmethod
     def skillSource() -> pathlib.Path:
-        packaged = AppPaths._moduleDir() / "skills" / AppPaths.SKILL_NAME / "SKILL.md"
+        here = AppPaths._moduleDir()
+        packaged = here / "skills" / AppPaths.SKILL_NAME / "SKILL.md"
         if packaged.is_file():
             return packaged
 
-        # Source checkout: src/agent_recorder/Paths.py -> repo/.grok/skills/...
-        repoSkill = AppPaths._moduleDir().parents[1] / ".grok" / "skills" / AppPaths.SKILL_NAME / "SKILL.md"
+        repoSkill = here.parents[1] / "skills" / AppPaths.SKILL_NAME / "SKILL.md"
         if repoSkill.is_file():
             return repoSkill
 

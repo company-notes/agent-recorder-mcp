@@ -3,5 +3,9 @@
   "entrypoint": "agent-recorder-mcp",
   "distributionName": "agent-recorder-mcp",
   "binaryEnvVar": "AGENT_RECORDER_BINARY",
-  "envKeys": ["AGENT_RECORDER_DIR", "AGENT_RECORDER_FFMPEG"]
+  "envKeys": [
+    "AGENT_RECORDER_DIR",
+    "AGENT_RECORDER_FFMPEG",
+    "FFL_NETWORK_PROFILE"
+  ]
 }

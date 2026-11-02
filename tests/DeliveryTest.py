@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 
+import socket
 import tempfile
 import unittest
 from pathlib import Path
 
 from agent_recorder.Delivery import FFLDelivery, GoogleDriveDelivery, LocalDelivery
 from agent_recorder.Models import DeliveryError
+from agent_recorder.NetworkProfile import FFLNetworkProfile
 
 from Support import sampleRecording
 
@@ -32,7 +34,8 @@ class DeliveryTest(unittest.TestCase):
     def testFflShareReturnsTheSessionLink(self):
         with tempfile.TemporaryDirectory() as directory:
             recording = sampleRecording(Path(directory))
-            result = FFLDelivery(_share).deliver(recording)
+            profile = FFLNetworkProfile(environ={"FFL_NETWORK_PROFILE": "p2p"})
+            result = FFLDelivery(_share, profile).deliver(recording)
             self.assertEqual(result.url, "https://fastfilelink.example/abc")
             self.assertEqual(result.session.captured["path"], str(recording.outputPath))
             self.assertEqual(result.session.captured["kwargs"], {"name": recording.outputPath.name})
@@ -48,9 +51,37 @@ class DeliveryTest(unittest.TestCase):
                 return session
 
             with self.assertRaises(DeliveryError):
-                FFLDelivery(share).deliver(recording)
+                profile = FFLNetworkProfile(environ={"FFL_NETWORK_PROFILE": "p2p"})
+                FFLDelivery(share, profile).deliver(recording)
 
             self.assertTrue(session.closed)
+
+    def testFflDeliveryAutoSelectsRelayForSyntheticDNS(self):
+        def resolve(hostname, port, type):
+            del hostname, type
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("198.18.0.1", port))]
+
+        with tempfile.TemporaryDirectory() as directory:
+            recording = sampleRecording(Path(directory))
+            profile = FFLNetworkProfile(environ={}, resolver=resolve)
+            result = FFLDelivery(_share, profile).deliver(recording)
+
+            self.assertEqual(result.session.captured["kwargs"], {
+                "name": recording.outputPath.name,
+                "force_relay": True,
+                "preferred_tunnel": "default:web",
+            })
+
+    def testFflDeliveryHonorsConfiguredRelay(self):
+        with tempfile.TemporaryDirectory() as directory:
+            recording = sampleRecording(Path(directory))
+            profile = FFLNetworkProfile(environ={"FFL_NETWORK_PROFILE": "relay"})
+            result = FFLDelivery(_share, profile).deliver(recording)
+
+            self.assertEqual(result.session.captured["kwargs"], {
+                "name": recording.outputPath.name,
+                "force_relay": True,
+            })
 
     def testLocalDeliveryReturnsAFileUri(self):
         with tempfile.TemporaryDirectory() as directory:

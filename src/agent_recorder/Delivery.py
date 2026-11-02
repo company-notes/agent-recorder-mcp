@@ -7,6 +7,7 @@ from __future__ import annotations
 import ffl
 
 from agent_recorder.Models import DeliveryError, DeliveryKind
+from agent_recorder.NetworkProfile import FFLNetworkProfile
 
 
 class DeliveryResult:
@@ -26,17 +27,20 @@ class DeliveryStrategy:
 class FFLDelivery(DeliveryStrategy):
     """Share a finished recording through ffl-python.
 
-    The link is a live peer-to-peer source. The local file stays until
+    The network profile selects relay for managed sandboxes and otherwise
+    leaves FFL's default P2P transport in place. The file stays until
     ``session.on('completed')`` reports FFL's ``/transfer/complete`` event.
     """
 
-    def __init__(self, shareFunction=None):
+    def __init__(self, shareFunction=None, networkProfile: FFLNetworkProfile | None = None):
         self._shareFunction = ffl.share if shareFunction is None else shareFunction
+        self._networkProfile = FFLNetworkProfile() if networkProfile is None else networkProfile
 
     def deliver(self, recording) -> DeliveryResult:
         session = self._shareFunction(
             str(recording.outputPath),
             name=recording.outputPath.name,
+            **self._networkProfile.shareOptions(),
         )
         url = getattr(session, "link", None)
         if not isinstance(url, str) or not url:

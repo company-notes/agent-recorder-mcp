@@ -6,7 +6,9 @@
 
 from __future__ import annotations
 
+import argparse
 import os
+import pathlib
 import sys
 
 from importlib.metadata import version
@@ -20,7 +22,29 @@ os.environ.setdefault("FASTMCP_SHOW_CLI_BANNER", "false")
 
 
 def _installSkillFromArgs() -> None:
-    SkillInstaller().install(overwrite="--overwrite" in sys.argv)
+    targets = SkillInstaller.targetsForMCPArguments(sys.argv)
+    SkillInstaller().install(targets=targets, overwrite="--overwrite" in sys.argv)
+
+
+def _installSkillCommand() -> None:
+    parser = argparse.ArgumentParser(prog="agent-recorder-mcp install-skill")
+    parser.add_argument("--target", help="Comma-separated agent names or all.")
+    parser.add_argument("--directory", type=pathlib.Path, help="Custom agent skills root.")
+    parser.add_argument("--overwrite", action="store_true")
+    args = parser.parse_args(sys.argv[2:])
+
+    if args.target is None:
+        targets = () if args.directory is not None else tuple(SkillInstaller.TARGET_DIRS)
+    elif args.target == "all":
+        targets = tuple(SkillInstaller.TARGET_DIRS)
+    else:
+        targets = tuple(item.strip() for item in args.target.split(","))
+
+    installer = SkillInstaller()
+    for destination in installer.install(
+        targets=targets, directory=args.directory, overwrite=args.overwrite,
+    ):
+        print(destination)
 
 
 def _dispatchInstall(command: str) -> None:
@@ -62,6 +86,10 @@ def installCommand() -> None:
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "--version":
         print(version("agent-recorder-mcp"))
+        return
+
+    if len(sys.argv) > 1 and sys.argv[1] == "install-skill":
+        _installSkillCommand()
         return
 
     if len(sys.argv) > 1 and sys.argv[1] in {"install", "uninstall"}:
