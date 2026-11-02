@@ -29,6 +29,7 @@ Useful environment variables:
 | --- | --- |
 | `AGENT_RECORDER_DIR` | Recording root. Default: `~/.agent-recorder` |
 | `AGENT_RECORDER_FFMPEG` | Explicit `ffmpeg` binary |
+| `FFL_NETWORK_PROFILE` | Optional FFL transport override: `relay`, `p2p`, `direct`, or `synthetic-dns-198-18` |
 
 Recordings are written to `<root>/recordings/rec_YYYYMMDD_HHMMSS_<id>.mp4`.
 
@@ -58,6 +59,23 @@ No active agent display could be identified.
 ```
 
 A blank frame on the identified display is still recorded. The browser often opens after recording starts.
+
+## FFL network transport
+
+FFL delivery selects a transport automatically when `finishRecording` shares a recording.
+If `FFL_NETWORK_PROFILE` is not set, the server probes DNS for `example.com` and
+`stun.cloudflare.com` in parallel, using a total timeout of 0.5 seconds.
+When **all** returned addresses for both hosts are in `198.18.0.0/15` (the synthetic DNS
+range used by some managed sandbox environments), it calls ffl-python with
+`force_relay=True` and `preferred_tunnel="default:web"`.
+Otherwise it leaves the existing P2P-first behavior unchanged.
+
+The optional `FFL_NETWORK_PROFILE` setting takes priority over detection:
+`relay` forces relay, `p2p` or `direct` keeps P2P, and
+`synthetic-dns-198-18` selects the managed-sandbox web relay policy.
+Unrecognized non-empty values raise an error rather than silently changing behavior.
+The selected profile is cached for the lifetime of the MCP server.
+This applies only to FFL shares; local and Google Drive delivery are unchanged.
 
 ## Cleanup
 
