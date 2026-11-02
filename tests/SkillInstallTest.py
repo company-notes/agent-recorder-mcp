@@ -17,7 +17,10 @@ class SkillInstallTest(unittest.TestCase):
         text = AppPaths.skillSource().read_text(encoding="utf-8")
         self.assertIn("startRecording", text)
         self.assertIn("finishRecording", text)
-        self.assertIn("v0.2.0", text)
+        self.assertIn("Bootstrap: Skill first, then MCP", text)
+        self.assertIn("startRecording", text)
+        self.assertIn("Check for the MCP tools", text)
+        self.assertIn("v0.2.1", text)
 
     def testInstallCopiesOnceUnlessOverwriteIsSet(self):
         with tempfile.TemporaryDirectory() as directory:
