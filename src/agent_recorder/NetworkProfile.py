@@ -28,6 +28,13 @@ class FFLNetworkProfile:
     PROBE_HOSTNAMES = ("example.com", "stun.cloudflare.com")
     PROBE_TIMEOUT_SECONDS = 0.5
 
+    @classmethod
+    def _isSyntheticAddress(cls, address: str) -> bool:
+        try:
+            return ipaddress.ip_address(address) in cls.SYNTHETIC_DNS_NETWORK
+        except ValueError:
+            return False
+
     def __init__(
         self,
         environ: Mapping[str, str] | None = None,
@@ -41,13 +48,6 @@ class FFLNetworkProfile:
         self._resolver = socket.getaddrinfo if resolver is None else resolver
         self._timeoutSeconds = timeoutSeconds
         self._shareOptions: dict | None = None
-
-    @classmethod
-    def _isSyntheticAddress(cls, address: str) -> bool:
-        try:
-            return ipaddress.ip_address(address) in cls.SYNTHETIC_DNS_NETWORK
-        except ValueError:
-            return False
 
     def _resolveHost(self, hostname: str, completed: queue.Queue) -> None:
         try:
