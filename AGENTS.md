@@ -12,7 +12,8 @@
 - `src/agent_recorder/NetworkProfile.py` — bounded synthetic-DNS detection and FFL transport selection.
 - `src/agent_recorder/Cleanup.py` — delete after FFL's `completed` event.
 - `src/agent_recorder/Store.py` — snake_case JSON metadata on disk.
-- `.grok/skills/agent-session-recording/SKILL.md` — when the agent must record.
+- `skills/agent-session-recording/SKILL.md` — vendor-neutral recording skill source.
+- `src/agent_recorder/SkillInstall.py` — installs the same skill to supported agents.
 
 ## Rules
 
@@ -28,10 +29,10 @@ FFL delivery uses `FFLNetworkProfile` to detect managed sandbox DNS and select w
 
 ## Commands
 
-People install the skill from tag `v0.1.0`. The skill installs the MCP connector and pins that same tag. Grok Bot adds a custom connector. `install --target grok-build` is only for Grok Build's `~/.grok/config.toml`.
+Version 0.2.0 uses the `v0.2.0` release ref. The common skill is installed into Grok, Claude Code, Codex, Cursor or Copilot directories via `install-skill`; `install --target` installs it alongside supported MCP clients. Grok Bot and Cursor need separate connector registration. Existing skills are not overwritten without `--overwrite`.
 
 ```text
-uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.1.0 agent-recorder-mcp
+uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.0 agent-recorder-mcp
 ```
 
 Tests on this machine use the `recoding-mcp` conda environment:
