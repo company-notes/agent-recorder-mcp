@@ -52,7 +52,7 @@ it can follow those instructions for the current session, but persistent
 skill installation still requires the client's supported mechanism.
 
 The Skill contains specific Grok Bot, Grok Build, Claude, Codex and Cursor
-connector setup steps. It pins the MCP source to `v0.2.1`:
+connector setup steps. It pins the MCP source to `v0.2.2`:
 
 ```json
 {
