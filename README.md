@@ -4,78 +4,77 @@ Local MCP server that records the computer an agent is using and returns a repla
 
 The recording stays on the agent machine. The model receives a link, not the video. FastFileLink is the delivery transport: the local file remains until the recipient finishes downloading.
 
-Version **0.2.0** captures the **agent machine's** Linux X11 display, not the
-user's desktop. This works with GrokBot and other agents when their runtime
-exposes an X11 display, MCP tools, and a supported skill-loading mechanism.
-Windows, macOS and Wayland capture are not implemented.
+Version **0.2.1** captures the **agent machine's** Linux X11 display,
+not the user's desktop. It works with compatible agents that have access to
+their own X11 display and MCP tools. Windows/macOS/Wayland capture is not implemented.
 
-## Install
+## Install — Skill first, MCP second
 
-The canonical skill is [skills/agent-session-recording/SKILL.md](skills/agent-session-recording/SKILL.md).
-It is **not GrokBot-specific**. One source is packaged with the MCP server and
-installed into supported agent skill directories.
+**Give the agent the Skill URL, not an MCP install command.** The skill is the
+single entry point for installation. It instructs the receiving agent to
+install/load the skill, check for the recording tools, register the pinned MCP
+connector if needed, and verify tool availability.
 
-Use Python 3.11+ (via `uvx`), `ffmpeg`, and an X11 size tool (`xdpyinfo` or
-`xwininfo`, usually from `x11-utils`). MCP registration, FFL sharing, and
-Google Drive uploads may ask for user approval.
+**Share this URL:**
 
-### Agent skill locations
+```text
+https://raw.githubusercontent.com/company-notes/agent-recorder-mcp/v0.2.1/skills/agent-session-recording/SKILL.md
+```
 
-| Agent | User skill location | MCP connector |
+[View the versioned SKILL.md on GitHub](https://github.com/company-notes/agent-recorder-mcp/blob/v0.2.1/skills/agent-session-recording/SKILL.md)
+
+An agent receiving only the repository URL should follow the same skill-first
+flow, starting from the link above. The common skill source lives at
+`skills/agent-session-recording/SKILL.md`. The MCP installer is **not required
+to install the skill**. Installing a skill does not automatically give an agent
+OS, connector-management or recording permissions: the agent must obtain any
+required approvals, and may need a client restart to discover the new tools.
+
+The agent should finish by stating separately whether the skill is installed,
+the MCP connector is registered, and `startRecording`, `recordingStatus`,
+`finishRecording` are actually available. A missing approval or unsupported
+MCP client must be reported as incomplete, not called installed.
+
+### Supported agent integration
+
+| Agent | Skill location | MCP registration |
 | --- | --- | --- |
-| Grok Bot / Grok Build | `~/.grok/skills/agent-session-recording/SKILL.md` | Grok Bot custom connector / Grok Build installer |
-| Claude Code | `~/.claude/skills/agent-session-recording/SKILL.md` | `install --target claude-code` |
-| Codex | `~/.agents/skills/agent-session-recording/SKILL.md` | `install --target codex` |
-| Cursor | `~/.cursor/skills/agent-session-recording/SKILL.md` | Configure `~/.cursor/mcp.json` |
-| VS Code / Copilot | `~/.copilot/skills/agent-session-recording/SKILL.md` | Configure your MCP client |
-| Other compatible agents | Custom `SKILL.md` directory | Configure your agent's stdio MCP client |
+| Grok Bot / Grok Build | `~/.grok/skills/agent-session-recording/SKILL.md` | Grok Bot custom connector / Grok Build config |
+| Claude Code | `~/.claude/skills/agent-session-recording/SKILL.md` | CLI/MCP installer |
+| Codex | `~/.agents/skills/agent-session-recording/SKILL.md` | MCP installer or TOML config |
+| Cursor | `~/.cursor/skills/agent-session-recording/SKILL.md` | MCP JSON config |
+| Copilot | `~/.copilot/skills/agent-session-recording/SKILL.md` | Client-specific MCP setup |
+| Other agents | Agent's supported skill directory | Client-specific stdio MCP setup |
 
-Install a matching MCP connector and skill for supported mcp-install clients:
+If a compatible skill manager is available, install the Skill using the URL
+above **before** handling the MCP. If the agent can only read the Skill,
+it can follow those instructions for the current session, but persistent
+skill installation still requires the client's supported mechanism.
 
-```bash
-uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.0 \
-  agent-recorder-mcp install --target claude-code,codex,grok-build --overwrite
-```
-
-The underlying `mcp-install` command accepts `claude-desktop`,
-`claude-code`, `codex`, and `grok-build` (`all` is its default).
-It installs skills only where a local skill directory is supported;
-Claude Desktop's skill workflow is separate from MCP registration.
-
-For GrokBot, Cursor, Copilot or other agents, install the portable skill
-independently, then register the connector using the instructions in `SKILL.md`:
-
-```bash
-uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.0 \
-  agent-recorder-mcp install-skill --target grok,cursor,copilot --overwrite
-```
-
-For an agent with another skill directory:
-
-```bash
-agent-recorder-mcp install-skill --directory /path/to/agent/skills --overwrite
-```
-
-The destination is `/path/to/agent/skills/agent-session-recording/SKILL.md`.
-You may also run `install-skill --target all` to copy the skill into all five
-supported local directories. A skill installation does **not** automatically
-register an MCP connector for clients lacking an installer backend.
-The same MCP command for all compatible stdio clients is:
+The Skill contains specific Grok Bot, Grok Build, Claude, Codex and Cursor
+connector setup steps. It pins the MCP source to `v0.2.1`:
 
 ```json
 {
   "command": "uvx",
   "args": [
     "--from",
-    "git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.0",
+    "git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.1",
     "agent-recorder-mcp"
   ]
 }
 ```
 
-Some cloud agents do not inherit local skills or provide an X11 display. In
-those environments, first configure the agent runtime and its MCP permissions;
-installing the skill file alone is insufficient.
+An already-installed local copy of this package also provides
+`agent-recorder-mcp install --target claude-code,codex,grok-build` for MCP
+registration, and `agent-recorder-mcp install-skill --target all` for copying
+the Skill to additional directories. These are **optional helpers**, not
+requirements for reading or installing the Skill first. Do not send users
+through an MCP-first workflow.
+
+The agent runtime needs Python 3.11+ via `uvx`, `ffmpeg`, and an X11 size
+tool (`xdpyinfo` or `xwininfo`, commonly `x11-utils`). MCP approval,
+FFL sharing and Drive uploads may require user permission.
 
 Useful environment variables:
 
@@ -139,7 +138,7 @@ Creating an FFL link does not delete the file. With `after_download`, the server
 
 ## Skill
 
-`skills/agent-session-recording/SKILL.md` is the single recording rule for all supported agents. Its installation paths differ, but every agent should call `startRecording` before browser/computer-use work and `finishRecording` before answering. The skill configures or requests an MCP connector when the tools are unavailable.
+`skills/agent-session-recording/SKILL.md` is the canonical **skill-first installation guide** and recording rule. The user shares this skill, the agent handles its own MCP setup as needed, and the agent verifies tool discovery before saying setup succeeded. During browser/computer-use work it calls `startRecording` before the first UI action and `finishRecording` before answering.
 
 ## Development
 
