@@ -27,6 +27,7 @@ from agent_recorder.Models import (
     Recording,
     RecordingNotFoundError,
     RecordingRequest,
+    RecordingTitle,
     RecordingState,
     UploadStatus,
 )
@@ -259,9 +260,16 @@ class RecordingService:
         fps: int,
         maxDurationSeconds: int,
         directory: pathlib.Path,
+        titleSlug: str | None,
     ) -> Recording:
         startedAt = self._clock.now()
         recordingId = self._newId(startedAt)
+        if titleSlug is None:
+            baseName = recordingId
+        else:
+            baseName = f"{startedAt.strftime('%Y-%m-%d_%H%M')}_{titleSlug}"
+
+        outputPath = RecordingFile.reserveMediaPath(directory, baseName)
         return Recording(
             recordingId=recordingId,
             state=RecordingState.RECORDING,
@@ -269,7 +277,7 @@ class RecordingService:
             fps=fps,
             startedAt=startedAt,
             maxDurationSeconds=maxDurationSeconds,
-            outputPath=directory / f"{recordingId}.mp4",
+            outputPath=outputPath,
             logPath=directory / f"{recordingId}.log",
             ffmpegPid=None,
             mcpPid=os.getpid(),
@@ -386,9 +394,11 @@ class RecordingService:
         fps: int = RecordingRequest.DEFAULT_FPS,
         maxDurationSeconds: int = RecordingRequest.DEFAULT_MAX_DURATION_SECONDS,
         outputDir: str | None = None,
+        title: str | None = None,
     ) -> StartResult:
         fps = RecordingRequest.fps(fps)
         maxDurationSeconds = RecordingRequest.maxDuration(maxDurationSeconds)
+        titleSlug = None if title is None else RecordingTitle.slug(title)
         with self._lock:
             active = self._activeRecording()
             if active is not None:
@@ -397,7 +407,7 @@ class RecordingService:
             directory = self._mediaDirectory(outputDir)
             self._capture.ensureAvailable()
             display = self._discovery.identify()
-            recording = self._create(display, fps, maxDurationSeconds, directory)
+            recording = self._create(display, fps, maxDurationSeconds, directory, titleSlug)
             try:
                 handle = self._capture.start(recording)
             except Exception:
