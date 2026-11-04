@@ -40,6 +40,14 @@ class FilesTest(unittest.TestCase):
             another = RecordingFile.reserveMediaPath(root, "clip")
             self.assertEqual(another.name, "clip-3.mp4")
 
+    def testReserveMediaPathAvoidsPreviouslyPackagedZip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "clip.zip").write_bytes(b"previous archive")
+            reserved = RecordingFile.reserveMediaPath(root, "clip")
+            self.assertEqual(reserved.name, "clip-2.mp4")
+            self.assertEqual((root / "clip.zip").read_bytes(), b"previous archive")
+
     def testDeleteMediaRemovesTheFileAndIgnoresAMissingOne(self):
         with tempfile.TemporaryDirectory() as directory:
             recording = sampleRecording(Path(directory))
