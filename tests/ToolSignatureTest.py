@@ -41,12 +41,40 @@ class ToolSignatureTest(unittest.TestCase):
         self.assertEqual(params["fps"].default, 5)
         self.assertEqual(params["maxDurationSeconds"].default, 7200)
         self.assertIsNone(params["outputDir"].default)
+        self.assertIn("title", params)
+        self.assertIsNone(params["title"].default)
+
+    def testStartRecordingTitleIsForwardedToService(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, _store, _delivery, _capture = openService(Path(directory))
+            MCP.hub.use(service)
+            started = self._call(MCP.startRecording, title="GitHub Login")
+            self.assertEqual(started["fileName"], "2026-10-05_1730_github-login.mp4")
+            self._call(MCP.abortRecording)
 
     def testFinishDefaults(self):
         params = self._params(MCP.finishRecording)
         self.assertIn("recordingId", params)
         self.assertEqual(params["delivery"].default, "ffl")
         self.assertEqual(params["cleanup"].default, "after_download")
+        self.assertEqual(params["package"].default, "video")
+        self.assertIsNone(params["summaryMarkdown"].default)
+
+    def testFinishRecordingPassesZipSummaryToService(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, _store, _delivery, _capture = openService(Path(directory))
+            MCP.hub.use(service)
+            started = self._call(MCP.startRecording, title="Github Login")
+            finished = self._call(
+                MCP.finishRecording,
+                package="zip",
+                summaryMarkdown="# Summary\\n1. Visited GitHub.",
+            )
+            self.assertEqual(
+                finished["downloadFileName"],
+                started["fileName"].replace(".mp4", ".zip"),
+            )
+            self._call(MCP.cleanupRecording, recordingId=started["recordingId"])
 
     def testConfirmUploadRequiresAnIdAndUrl(self):
         params = self._params(MCP.confirmUpload)

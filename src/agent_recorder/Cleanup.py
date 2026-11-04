@@ -42,6 +42,7 @@ class AfterDownloadCleanup:
             )
 
         RecordingFile.deleteMedia(recording)
+        RecordingFile.deleteArchive(recording)
         RecordingFile.deleteLog(recording)
         recording.state = RecordingState.CLEANED
         recording.shareSession = None

@@ -19,11 +19,18 @@ class SkillInstallTest(unittest.TestCase):
         self.assertIn("finishRecording", text)
         self.assertIn("Bootstrap: Skill first, then MCP", text)
         self.assertIn("startRecording", text)
-        self.assertIn("Check for the MCP tools", text)
-        self.assertIn("recording summary: the time span and duration", text)
-        self.assertIn("Never put passwords,", text)
+        self.assertIn("Check the MCP tools and version compatibility", text)
+        self.assertIn("supports `title`", text)
+        self.assertIn("supports `package` and `summaryMarkdown`", text)
+        self.assertIn("write the", text)
+        self.assertIn("Markdown recording summary", text)
+        self.assertIn("summary.md", text)
+        self.assertIn("Never include passwords, verification codes,", text)
         self.assertIn("the replay URL and its recording summary", text)
-        self.assertIn("v0.2.2", text)
+        self.assertIn("v0.2.3", text)
+        self.assertIn("startRecording(title=", text)
+        self.assertIn('finishRecording(package="zip", summaryMarkdown="...")', text)
+        self.assertIn("YYYY-MM-DD_HHMM_", text)
 
     def testInstallCopiesOnceUnlessOverwriteIsSet(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -14,7 +14,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from agent_recorder.Models import CleanupPolicy, DeliveryKind, Recording, RecordingRequest
+from agent_recorder.Models import CleanupPolicy, DeliveryKind, PackageKind, Recording, RecordingRequest
 from agent_recorder.Service import RecordingService, buildDefaultService
 
 
@@ -50,6 +50,7 @@ def startRecording(
     fps: int = RecordingRequest.DEFAULT_FPS,
     maxDurationSeconds: int = RecordingRequest.DEFAULT_MAX_DURATION_SECONDS,
     outputDir: str | None = None,
+    title: str | None = None,
 ) -> dict[str, Any]:
     """Start recording the agent computer display before browser or computer-use actions.
 
@@ -59,18 +60,25 @@ def startRecording(
     fps defaults to 5. maxDurationSeconds defaults to 7200. When the limit is reached
     the capture stops and the file is kept so finishRecording can still share it.
 
+    title, when supplied, names the MP4 using the agent's local start time:
+    YYYY-MM-DD_HHMM_title.mp4 (e.g. 2026-11-04_1408_github-login.mp4).
+    Unsafe filename characters are converted to hyphens. A duplicate filename
+    gets a -2, -3, etc. suffix, never overwriting an earlier recording.
+    If title is omitted, the legacy unique recording ID filename is used.
+
     outputDir writes the recording file directly into that directory. Omit it to use
     the default recordings directory. The directory must already exist and be writable.
     When the replay will be uploaded with a connected Google Drive tool, pass a
     directory that tool can read, such as /workspace.
 
     If a recording is already active, or is waiting to be shared, that recording is
-    returned and a second recorder is not started. outputDir is ignored in that case.
+    returned and a second recorder is not started. title and outputDir are ignored in that case.
     """
     result = _service().start(
         fps=fps,
         maxDurationSeconds=maxDurationSeconds,
         outputDir=outputDir,
+        title=title,
     )
     return _service().payloadFor(result.recording, alreadyRecording=result.alreadyRecording)
 
@@ -94,6 +102,8 @@ def finishRecording(
     recordingId: str | None = None,
     delivery: str = "ffl",
     cleanup: str = "after_download",
+    package: str = "video",
+    summaryMarkdown: str | None = None,
 ) -> dict[str, Any]:
     """Stop the recording and hand it to a transfer strategy.
 
@@ -106,13 +116,25 @@ def finishRecording(
     returns localPath and uploadStatus pending. Upload that file with the
     connected Google Drive tool, then call confirmUpload with the Drive link.
 
-    Put the returned url in the final answer as the operation replay. If this call
-    fails, tell the user that no replay was produced and include the reason.
+    For the recommended Skill workflow, pass package="zip" and a non-empty
+    summaryMarkdown. The MCP first finalizes the named MP4 locally, builds a
+    same-stem ZIP containing the MP4 and summary.md, then shares the ZIP by FFL.
+    The ZIP and original MP4 remain local until a completed download triggers
+    after_download cleanup of both files. Do not put passwords, verification
+    codes or key contents in summaryMarkdown.
+
+    package="video" (the legacy default) continues sharing the MP4 directly;
+    ZIP packaging currently supports ffl delivery only.
+
+    Put the returned url in the final answer along with the summary. If this
+    call fails, explain that no new replay was produced and why.
     """
     recording = _service().finish(
         recordingId,
         DeliveryKind.parse(delivery),
         CleanupPolicy.parse(cleanup),
+        PackageKind.parse(package),
+        summaryMarkdown,
     )
     return _service().payloadFor(recording)
 

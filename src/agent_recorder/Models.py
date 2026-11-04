@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import pathlib
+import unicodedata
 
 from datetime import datetime
 from enum import IntEnum
@@ -73,6 +74,11 @@ class DeliveryKind(ApiEnum):
     GOOGLE_DRIVE = 3
 
 
+class PackageKind(ApiEnum):
+    VIDEO = 1
+    ZIP = 2
+
+
 class UploadStatus(ApiEnum):
     PENDING = 1
     CONFIRMED = 2
@@ -116,6 +122,31 @@ class RecordingRequest:
         return value
 
 
+class RecordingTitle:
+    """Convert a user-supplied title into a safe, short filename component."""
+
+    MAX_SLUG_LENGTH = 48
+
+    @classmethod
+    def slug(cls, title: str) -> str:
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError("title must be a non-empty string.")
+
+        normalized = unicodedata.normalize("NFKC", title).casefold()
+        characters = []
+        for character in normalized:
+            if character.isalnum():
+                characters.append(character)
+            elif characters and characters[-1] != "-":
+                characters.append("-")
+
+        slug = "".join(characters).strip("-")[:cls.MAX_SLUG_LENGTH].rstrip("-")
+        if not slug:
+            raise ValueError("title must contain at least one letter or digit.")
+
+        return slug
+
+
 class Recording:
     """One local capture and the delivery state attached to it."""
 
@@ -136,6 +167,7 @@ class Recording:
         url: str | None,
         error: str | None,
         uploadStatus: UploadStatus | None = None,
+        archivePath: pathlib.Path | None = None,
     ):
         self.recordingId = recordingId
         self.state = state
@@ -152,6 +184,7 @@ class Recording:
         self.url = url
         self.error = error
         self.uploadStatus = uploadStatus
+        self.archivePath = archivePath
         self.handle = None
         self.shareSession = None
         self.watchThread = None
@@ -181,6 +214,7 @@ class Recording:
             url=data["url"],
             error=data["error"],
             uploadStatus=None if uploadStatus is None else UploadStatus.parse(uploadStatus),
+            archivePath=None if data.get("archive_path") is None else pathlib.Path(data["archive_path"]),
         )
 
     def startedAtText(self) -> str:
@@ -198,6 +232,9 @@ class Recording:
         except FileNotFoundError:
             return 0
 
+    def sharePath(self) -> pathlib.Path:
+        return self.outputPath if self.archivePath is None else self.archivePath
+
     def toDisk(self) -> dict:
         return {
             "recording_id": self.recordingId,
@@ -207,6 +244,7 @@ class Recording:
             "started_at": self.startedAtText(),
             "max_duration_seconds": self.maxDurationSeconds,
             "output_path": str(self.outputPath),
+            "archive_path": None if self.archivePath is None else str(self.archivePath),
             "log_path": str(self.logPath),
             "ffmpeg_pid": self.ffmpegPid,
             "mcp_pid": self.mcpPid,
@@ -222,6 +260,8 @@ class Recording:
             "recordingId": self.recordingId,
             "state": self.state.name.lower(),
             "startedAt": self.startedAtText(),
+            "fileName": self.outputPath.name,
+            "downloadFileName": self.sharePath().name,
             "display": self.display,
             "fps": self.fps,
             "durationSeconds": self.durationSeconds(now),

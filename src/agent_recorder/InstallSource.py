@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import importlib.metadata
 import json
-import os
 import pathlib
 import urllib.parse
 
@@ -28,7 +27,7 @@ class DirectoryInstallSource:
     def fileUrlPath(url: str) -> pathlib.Path:
         parsed = urllib.parse.urlparse(url)
         rawPath = urllib.parse.unquote(parsed.path)
-        if os.name == "nt" and rawPath.startswith("/") and len(rawPath) >= 3 and rawPath[2] == ":":
+        if len(rawPath) >= 3 and rawPath[0] == "/" and rawPath[1].isalpha() and rawPath[2] == ":":
             rawPath = rawPath[1:]
 
         return pathlib.Path(rawPath)

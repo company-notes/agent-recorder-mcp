@@ -26,18 +26,21 @@ recording are not implemented.
    continue these instructions. If the client can only read instructions,
    use them for this session and say if persistent skill installation is
    unavailable. Do not pretend reading a URL installs a skill.
-2. **Check for the MCP tools.** Discover whether `startRecording`,
-   `recordingStatus` and `finishRecording` are available. If they are,
-   skip connector installation; do not replace a working connector.
+2. **Check the MCP tools and version compatibility.** Discover whether
+   `startRecording`, `recordingStatus` and `finishRecording` are available,
+   whether `startRecording` supports `title`, and whether `finishRecording`
+   supports `package` and `summaryMarkdown`. If all checks pass, skip
+   connector installation. Otherwise, upgrade the MCP to the pinned version
+   below; merely finding older recording tools is not sufficient.
 3. **Identify the current agent and its connector setup method.** When the
    tools are missing, register the pinned `agent-recorder` MCP server using
    the appropriate method below. Perform supported tool/CLI/configuration
    actions yourself if permitted. Request approval when the client requires
    it. Do not ask the user to manually follow a command you can run.
 4. **Reload/reconnect if necessary.** Refresh MCP discovery (or restart the
-   client when required) and check that `startRecording`,
-   `recordingStatus`, and `finishRecording` are now available. Reading
-   a config file alone is not proof the MCP server is running.
+   client when required) and verify `startRecording(title=...)`,
+   `recordingStatus`, and `finishRecording(package=..., summaryMarkdown=...)`
+   are available. Reading a config file is not proof the tools are running.
 5. **Report the result.** Say whether the skill was installed/persisted,
    whether the MCP connector was registered, and whether its tools were
    verified. If you lack permission or cannot register a connector, provide
@@ -49,10 +52,10 @@ MCP is not a prerequisite for installing or reading this skill.
 
 ### Pinned MCP source
 
-Install only `v0.2.2`, not an unpinned default branch:
+Install only `v0.2.3`, not an unpinned default branch:
 
 ```text
-git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2
+git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.3
 ```
 
 Common stdio MCP connector entry:
@@ -62,7 +65,7 @@ Common stdio MCP connector entry:
   "command": "uvx",
   "args": [
     "--from",
-    "git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2",
+    "git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.3",
     "agent-recorder-mcp"
   ]
 }
@@ -71,23 +74,23 @@ Common stdio MCP connector entry:
 ### Agent-specific connector installation
 
 - **Grok Bot:** Use its **custom connector** setup with command `uvx`
-  and arguments `--from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2 agent-recorder-mcp`.
+  and arguments `--from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.3 agent-recorder-mcp`.
   Grok Bot is **not** Grok Build. If its custom connector can only be
   managed through a user approval/UI unavailable to you, ask the user to
   approve or add the entry, then recheck the tools. Do not run the Grok
   Build installer for Grok Bot.
 - **Grok Build:** If shell access is available, run:
-  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2 agent-recorder-mcp install --target grok-build`.
+  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.3 agent-recorder-mcp install --target grok-build`.
   This writes the Grok Build MCP configuration, not the Grok Bot connector.
 - **Claude Code:** With shell access run:
-  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2 agent-recorder-mcp install --target claude-code`.
+  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.3 agent-recorder-mcp install --target claude-code`.
   Alternatively use `claude mcp add-json agent-recorder --scope user`
   with the stdio entry above.
 - **Claude Desktop:** Register the stdio entry under `mcpServers` in
   `claude_desktop_config.json`. Desktop skill availability is separate
   from its MCP configuration; follow the client's skill installation rules.
 - **Codex:** With shell access run:
-  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2 agent-recorder-mcp install --target codex`.
+  `uvx --from git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.3 agent-recorder-mcp install --target codex`.
   Alternatively configure `[mcp_servers.agent-recorder]` in
   `~/.codex/config.toml` using `command = "uvx"` and corresponding `args`.
 - **Cursor:** Add the stdio entry under `mcpServers` in
@@ -107,7 +110,7 @@ require user approval. Respect every prompt.
 A user can share the canonical, versioned SKILL.md directly:
 
 ```text
-https://raw.githubusercontent.com/company-notes/agent-recorder-mcp/v0.2.2/skills/agent-session-recording/SKILL.md
+https://raw.githubusercontent.com/company-notes/agent-recorder-mcp/v0.2.3/skills/agent-session-recording/SKILL.md
 ```
 
 Start at **Bootstrap: Skill first, then MCP**. The user should not need
@@ -120,31 +123,48 @@ that command only helps copy an already available skill to other locations.
 
 After the connector tools are verified:
 
-1. Before the first browser/computer UI action, call `startRecording`.
-   Set `fps` or `maxDurationSeconds` only if requested. Default FFL
-   sharing needs no custom `outputDir`.
+1. **Before the first browser/computer UI action, choose a short, descriptive
+   task title and call `startRecording(title="...")`.** For example,
+   `startRecording(title="devto-hashnode-github-login")`. Always pass `title`
+   when starting a new recording. The MCP names the MP4
+   `YYYY-MM-DD_HHMM_<title>.mp4` using its local start time, normalizes
+   unsafe filename characters, and adds `-2`, `-3` etc. for duplicates.
+   Do not manually rename or move the file. Set `fps` or
+   `maxDurationSeconds` only if requested. Default FFL sharing needs
+   no custom `outputDir`.
 2. Perform the user's task on the agent's own browser/computer.
-3. Call `finishRecording` after the last UI action.
-4. Include the returned replay `url` in the final response, together with
-   a recording summary: the time span and duration, then a short numbered
-   list of what was done in the recording (key steps, accounts and systems
-   touched, anything created or changed, human help such as 2FA, and any
-   mistakes or detours and how they were fixed). Never put passwords,
-   codes or key contents in the summary.
-5. If recording fails, continue only if safe, and clearly state that no
-   replay was produced and why.
-6. Do not record tasks without browser/computer UI unless explicitly asked.
+3. After the final UI action, call `recordingStatus` and **write the
+   Markdown recording summary**. Include the recording time span and duration,
+   then a numbered list of key steps, systems and accounts touched, things
+   created or changed, user assistance such as 2FA, and errors or detours
+   plus how they were resolved. Never include passwords, verification codes,
+   API keys, private keys or other credential contents; do not invent actions.
+4. Call `finishRecording(package="zip", summaryMarkdown="...")` using the
+   **actual complete Markdown summary**, not the literal ellipsis. Keep the
+   default `delivery="ffl"` and `cleanup="after_download"`. The MCP first
+   finalizes the local MP4, then builds a same-stem ZIP named
+   `YYYY-MM-DD_HHMM_<title>.zip` containing that MP4 and `summary.md`.
+   Only after successful packaging does it start the FFL share. Do not
+   manually rename files, use a separate FFL MCP, or send video bytes in chat.
+5. Return the FFL ZIP `url` together with **the same summary** in the final
+   answer. After a completed download, the MCP deletes both local MP4 and ZIP.
+6. If the recording, ZIP creation or sharing fails, clearly explain that
+   no new replay was produced. Do not claim a link exists when none was
+   returned; keep recoverable files for an authorized retry.
+7. Do not record tasks without browser/computer UI unless explicitly asked.
 
 Do not read the video into the conversation. The model gets a replay link.
 For managed-sandbox synthetic DNS, FFL chooses a web relay automatically;
-otherwise it keeps its P2P-first behavior. The local recording is retained
-until FFL reports a completed download.
+otherwise it keeps its P2P-first behavior. In ZIP mode, the original MP4 and
+ZIP stay local until FFL reports a completed download, when both are deleted.
+If nobody completes the download, both files are retained.
 
 ## Google Drive
 
-If the user requests Google Drive delivery and a Drive connector exists:
+If the user requests Google Drive delivery and a Drive connector exists,
+use the existing MP4 handoff instead of ZIP-over-FFL:
 
-1. Start with `startRecording(outputDir=...)` pointing to an existing
+1. Start with `startRecording(title="...", outputDir=...)` pointing to an existing
    directory the upload connector can read.
 2. Finish with `finishRecording(delivery="google_drive", cleanup="after_upload")`.
 3. Upload the returned `localPath` with that connector, without reading

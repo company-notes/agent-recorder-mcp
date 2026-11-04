@@ -51,6 +51,25 @@ class RecordingFile:
     TAIL_BYTES = 4 * 1024 * 1024
 
     @staticmethod
+    def reserveMediaPath(directory: pathlib.Path, baseName: str) -> pathlib.Path:
+        """Atomically reserve a new MP4 path, never overwriting an existing file."""
+        for index in range(1, 1001):
+            suffix = "" if index == 1 else f"-{index}"
+            path = directory / f"{baseName}{suffix}.mp4"
+            if path.with_suffix(".zip").exists():
+                continue
+
+            try:
+                with path.open("xb"):
+                    pass
+            except FileExistsError:
+                continue
+
+            return path
+
+        raise RecorderError(f"Could not reserve a unique filename for {baseName}.")
+
+    @staticmethod
     def isPlayable(path: pathlib.Path) -> bool:
         try:
             if not path.is_file():
@@ -78,6 +97,18 @@ class RecordingFile:
             recording.outputPath.unlink(missing_ok=True)
         except OSError as error:
             logger.error("Could not delete recording %s: %s", recording.outputPath, error)
+            raise
+
+    @staticmethod
+    def deleteArchive(recording) -> None:
+        path = recording.archivePath
+        if path is None:
+            return
+
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as error:
+            logger.error("Could not delete recording archive %s: %s", path, error)
             raise
 
     @staticmethod

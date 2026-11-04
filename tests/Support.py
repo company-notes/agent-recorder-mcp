@@ -156,7 +156,7 @@ class FakeDelivery:
         self.calls = []
 
     def deliver(self, recording):
-        self.calls.append(recording.outputPath)
+        self.calls.append(recording.sharePath())
         return DeliveryResult(
             url=self.session.link,
             session=self.session,

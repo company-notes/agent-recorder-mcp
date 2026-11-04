@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import zipfile
 import tempfile
 import unittest
 from datetime import timedelta
@@ -12,9 +13,11 @@ from unittest.mock import patch
 from agent_recorder.Cleanup import AfterDownloadCleanup
 from agent_recorder.Delivery import DeliveryFactory, LocalDelivery
 from agent_recorder.Models import (
+    CaptureError,
     CleanupPolicy,
     DeliveryError,
     DeliveryKind,
+    PackageKind,
     DisplayNotFoundError,
     FfmpegNotFoundError,
     RecorderError,
@@ -59,15 +62,171 @@ class ServiceTest(unittest.TestCase):
             self.assertEqual(disk.fps, 5)
             self.assertEqual(disk.display, ":12")
 
+    def testTitleNamesFflReplayAndDownloadCleanupDeletesIt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, store, delivery, _capture = openService(Path(directory))
+            started = service.start(title="Dev.to / Hashnode GitHub Login!")
+            recording = started.recording
+            name = "2026-10-05_1730_dev-to-hashnode-github-login.mp4"
+            self.assertEqual(recording.outputPath.name, name)
+            self.assertEqual(service.payloadFor(recording)["fileName"], name)
+            self.assertEqual(store.load(recording.recordingId).outputPath, recording.outputPath)
+
+            finished = service.finish()
+            self.assertEqual(delivery.calls, [recording.outputPath])
+            self.assertTrue(finished.outputPath.exists())
+            self.assertEqual(finished.url, "https://fastfilelink.example/replay")
+            delivery.session.emitCompleted()
+            self.assertFalse(finished.outputPath.exists())
+            self.assertEqual(finished.state, RecordingState.CLEANED)
+
+    def testZipDeliveryPreservesSummaryAndDeletesBothFilesAfterDownload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, store, delivery, _capture = openService(Path(directory))
+            started = service.start(title="Github Login")
+            videoPath = started.recording.outputPath
+            summary = "# Session summary\n- Started at 17:30\n- User completed 2FA."
+            finished = service.finish(
+                package=PackageKind.ZIP,
+                summaryMarkdown=summary,
+            )
+            archivePath = videoPath.with_suffix(".zip")
+            self.assertEqual(finished.archivePath, archivePath)
+            self.assertEqual(delivery.calls, [archivePath])
+            self.assertTrue(videoPath.exists())
+            self.assertTrue(archivePath.exists())
+            self.assertEqual(service.payloadFor(finished)["downloadFileName"], archivePath.name)
+            with zipfile.ZipFile(archivePath) as archive:
+                self.assertEqual(sorted(archive.namelist()), sorted([videoPath.name, "summary.md"]))
+                self.assertEqual(archive.read(videoPath.name), PLAYABLE_BYTES)
+                self.assertEqual(archive.read("summary.md").decode(), summary + "\n")
+
+            reloaded = store.load(started.recording.recordingId)
+            self.assertEqual(reloaded.archivePath, archivePath)
+            delivery.session.emitCompleted()
+            self.assertFalse(videoPath.exists())
+            self.assertFalse(archivePath.exists())
+            self.assertEqual(finished.state, RecordingState.CLEANED)
+
+    def testFflFailureRetainsArchiveAndAllowsRetry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, _store, delivery, _capture = openService(Path(directory))
+            started = service.start(title="Task")
+            summary = "# Summary"
+            with patch.object(delivery, "deliver", side_effect=DeliveryError("offline")):
+                with self.assertRaises(DeliveryError):
+                    service.finish(package=PackageKind.ZIP, summaryMarkdown=summary)
+
+            video = started.recording.outputPath
+            archive = video.with_suffix(".zip")
+            self.assertEqual(started.recording.state, RecordingState.READY)
+            self.assertTrue(video.exists())
+            self.assertTrue(archive.exists())
+
+            finished = service.finish(package=PackageKind.ZIP, summaryMarkdown=summary)
+            self.assertEqual(delivery.calls, [archive])
+            self.assertEqual(finished.archivePath, archive)
+            delivery.session.emitCompleted()
+            self.assertFalse(video.exists())
+            self.assertFalse(archive.exists())
+
+    def testMissingZipSummaryFailsBeforeCaptureIsStopped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, _store, _delivery, capture = openService(Path(directory))
+            started = service.start(title="Task")
+            for summary in (None, "", "  "):
+                with self.subTest(summary=summary), self.assertRaises(ValueError):
+                    service.finish(package=PackageKind.ZIP, summaryMarkdown=summary)
+
+            self.assertTrue(capture.handle.running)
+            self.assertFalse(started.recording.outputPath.with_suffix(".zip").exists())
+            service.abort()
+
+    def testZipCannotUseLocalOrGoogleDriveDelivery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, _store, _delivery, capture = openService(Path(directory))
+            service.start(title="Task")
+            with self.assertRaises(DeliveryError):
+                service.finish(
+                    package=PackageKind.ZIP,
+                    delivery=DeliveryKind.LOCAL,
+                    cleanup=CleanupPolicy.MANUAL,
+                    summaryMarkdown="summary",
+                )
+
+            self.assertTrue(capture.handle.running)
+            service.abort()
+
+    def testExplicitCleanupDeletesArchiveAndOriginalVideo(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, _store, _delivery, _capture = openService(Path(directory))
+            started = service.start(title="Task")
+            finished = service.finish(package=PackageKind.ZIP, summaryMarkdown="summary")
+            archive = finished.archivePath
+            video = finished.outputPath
+            service.cleanup(started.recording.recordingId)
+            self.assertFalse(video.exists())
+            self.assertFalse(archive.exists())
+
+    def testSameTitleSameMinuteNeverOverwritesAnExistingFile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            media = root / "recordings"
+            media.mkdir()
+            existing = media / "2026-10-05_1730_github-login.mp4"
+            existing.write_bytes(b"keep me")
+            service, _store, _delivery, _capture = openService(root)
+
+            first = service.start(title="GitHub Login").recording
+            self.assertEqual(first.outputPath.name, "2026-10-05_1730_github-login-2.mp4")
+            service.finish(delivery=DeliveryKind.LOCAL, cleanup=CleanupPolicy.MANUAL)
+            self.assertEqual(existing.read_bytes(), b"keep me")
+            self.assertTrue(first.outputPath.exists())
+
+            second = service.start(title="GitHub Login").recording
+            self.assertEqual(second.outputPath.name, "2026-10-05_1730_github-login-3.mp4")
+            self.assertEqual(first.outputPath.read_bytes(), PLAYABLE_BYTES)
+            self.assertEqual(existing.read_bytes(), b"keep me")
+            service.abort()
+            self.assertEqual(existing.read_bytes(), b"keep me")
+
+    def testInvalidTitleFailsBeforeDiscovery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            discovery = FakeDiscovery()
+            service, _store, _delivery, capture = openService(Path(directory), discovery=discovery)
+            for title in ("", "  ", "/...\\", "✨", 42):
+                with self.subTest(title=title), self.assertRaises(ValueError):
+                    service.start(title=title)
+
+            self.assertEqual(discovery.calls, 0)
+            self.assertEqual(capture.started, [])
+
+    def testCaptureFailureRemovesReservedNamedFile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service, _store, _delivery, _capture = openService(root, capture=FakeCapture(failStart=True))
+            with self.assertRaises(CaptureError):
+                service.start(title="Failed start")
+
+            self.assertFalse(list((root / "recordings").glob("*.mp4")))
+
+    def testUntitledRecordingStillUsesLegacyFilename(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, _store, _delivery, _capture = openService(Path(directory))
+            recording = service.start().recording
+            self.assertEqual(recording.outputPath.name, f"{recording.recordingId}.mp4")
+            service.abort()
+
     def testOutputDirIsRecordedAndCleanupDeletesThatFile(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             media = root / "workspace"
             media.mkdir()
             service, _store, _delivery, capture = openService(root)
-            started = service.start(outputDir=str(media))
+            started = service.start(outputDir=str(media), title="Drive Upload")
             recording = started.recording
             self.assertEqual(recording.outputPath.parent.resolve(), media.resolve())
+            self.assertEqual(recording.outputPath.name, "2026-10-05_1730_drive-upload.mp4")
             self.assertEqual(capture.started, [":12"])
             recording.outputPath.write_bytes(PLAYABLE_BYTES)
             metadataPath = root / "recordings" / f"{recording.recordingId}.json"

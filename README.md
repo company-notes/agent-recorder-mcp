@@ -4,7 +4,7 @@ Local MCP server that records the computer an agent is using and returns a repla
 
 The recording stays on the agent machine. The model receives a link, not the video. FastFileLink is the delivery transport: the local file remains until the recipient finishes downloading.
 
-Version **0.2.2** captures the **agent machine's** Linux X11 display,
+Version **0.2.3** captures the **agent machine's** Linux X11 display,
 not the user's desktop. It works with compatible agents that have access to
 their own X11 display and MCP tools. Windows/macOS/Wayland capture is not implemented.
 
@@ -18,10 +18,10 @@ connector if needed, and verify tool availability.
 **Share this URL:**
 
 ```text
-https://raw.githubusercontent.com/company-notes/agent-recorder-mcp/v0.2.2/skills/agent-session-recording/SKILL.md
+https://raw.githubusercontent.com/company-notes/agent-recorder-mcp/v0.2.3/skills/agent-session-recording/SKILL.md
 ```
 
-[View the versioned SKILL.md on GitHub](https://github.com/company-notes/agent-recorder-mcp/blob/v0.2.2/skills/agent-session-recording/SKILL.md)
+[View the versioned SKILL.md on GitHub](https://github.com/company-notes/agent-recorder-mcp/blob/v0.2.3/skills/agent-session-recording/SKILL.md)
 
 An agent receiving only the repository URL should follow the same skill-first
 flow, starting from the link above. The common skill source lives at
@@ -52,14 +52,14 @@ it can follow those instructions for the current session, but persistent
 skill installation still requires the client's supported mechanism.
 
 The Skill contains specific Grok Bot, Grok Build, Claude, Codex and Cursor
-connector setup steps. It pins the MCP source to `v0.2.2`:
+connector setup steps. It pins the MCP source to `v0.2.3`:
 
 ```json
 {
   "command": "uvx",
   "args": [
     "--from",
-    "git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.2",
+    "git+https://github.com/company-notes/agent-recorder-mcp.git@v0.2.3",
     "agent-recorder-mcp"
   ]
 }
@@ -84,22 +84,48 @@ Useful environment variables:
 | `AGENT_RECORDER_FFMPEG` | Explicit `ffmpeg` binary |
 | `FFL_NETWORK_PROFILE` | Optional FFL transport override: `relay`, `p2p`, `direct`, or `synthetic-dns-198-18` |
 
-Recordings are written to `<root>/recordings/rec_YYYYMMDD_HHMMSS_<id>.mp4`.
+Pass `title` to `startRecording` to name an MP4 using the agent machine's
+**local start time**. For example:
+
+```text
+2026-11-04_1408_devto-hashnode-github-login.mp4
+```
+
+Unsafe filename characters become hyphens. If the same title is used
+again within a minute, the MCP appends `-2`, `-3`, etc. and never overwrites
+an existing recording. The normalized title is limited to 48 characters.
+The `fileName` field in the tool response identifies the actual MP4 name.
+
+For backward compatibility, omitting `title` still generates
+`rec_YYYYMMDD_HHMMSS_<id>.mp4`. The default folder is
+`<root>/recordings`; `outputDir` can select an existing writable folder.
+The **recommended Skill workflow** calls
+`finishRecording(package="zip", summaryMarkdown="...")`, which first
+finalizes the local MP4, then creates a same-stem `YYYY-MM-DD_HHMM_title.zip`
+containing exactly that MP4 and `summary.md`. FFL shares **the ZIP**, not the
+original MP4. `after_download` deletes **both the ZIP and MP4** when the
+download completes. The `downloadFileName` field reports the shared ZIP name;
+`fileName` remains the original MP4 name.
+
+For backward compatibility, `finishRecording()` without `package="zip"`
+still shares the original MP4. ZIP packaging currently requires FFL and a
+non-empty `summaryMarkdown`; local or Google Drive delivery retains the
+existing MP4 behavior.
 
 ## Tools
 
 | Tool | Purpose |
 | --- | --- |
-| `startRecording` | Select this agent's display and start FFmpeg. Defaults: 5 fps, 7200 seconds. Optional `outputDir` writes the file into an existing writable folder. |
+| `startRecording` | Select this agent's display and start FFmpeg. Defaults: 5 fps, 7200 seconds. Supply `title` to generate a descriptive MP4. Optional `outputDir` writes the file into an existing writable folder. |
 | `recordingStatus` | Duration, size, display, and state. `idle` when nothing is active. |
-| `finishRecording` | Stop, finalize, and hand the file to a transfer strategy. |
+| `finishRecording` | Finalize a recording. Use `package="zip"` with `summaryMarkdown` to share a ZIP containing the MP4 and `summary.md` through FFL; the default `package="video"` preserves legacy behavior. |
 | `confirmUpload` | Store the Google Drive link and apply `after_upload` cleanup. |
 | `abortRecording` | Stop without sharing. Deletes the partial file unless `deletePartial` is false. |
 | `cleanupRecording` | Delete one local recording by `recordingId` and stop its share. |
 
-`finishRecording` defaults to `delivery=ffl` and `cleanup=after_download`. `delivery=local` with `cleanup=manual` returns a `file:` URI and leaves the file in place. `delivery=google_drive` with `cleanup=after_upload` returns `localPath` for the assistant's Google Drive connector. Pass `outputDir` on `startRecording` as a folder that connector can read, such as `/workspace`. `confirmUpload` stores the Drive URL and then deletes that file.
+`finishRecording` defaults to `delivery=ffl` and `cleanup=after_download`. In ZIP mode, both the MP4 and the ZIP remain on disk until FFL's completed-download event triggers cleanup. `delivery=local` with `cleanup=manual` returns a `file:` URI and leaves the MP4 in place. `delivery=google_drive` with `cleanup=after_upload` returns `localPath` for the assistant's Google Drive connector. Pass `outputDir` on `startRecording` as a folder that connector can read, such as `/workspace`. `confirmUpload` stores the Drive URL and then deletes that file.
 
-A second `startRecording` while one recording is active returns that recording and sets `alreadyRecording` to true.
+A second `startRecording` while one recording is active returns that recording and sets `alreadyRecording` to true. Its existing filename is unchanged. The Skill must verify that `startRecording` exposes `title` **and** `finishRecording` exposes `package` and `summaryMarkdown`, upgrading an older MCP when needed.
 
 ## Display selection
 
@@ -138,9 +164,9 @@ Creating an FFL link does not delete the file. With `after_download`, the server
 
 ## Skill
 
-`skills/agent-session-recording/SKILL.md` is the canonical **skill-first installation guide** and recording rule. The user shares this skill, the agent handles its own MCP setup as needed, and the agent verifies tool discovery before saying setup succeeded. During browser/computer-use work it calls `startRecording` before the first UI action and `finishRecording` before answering.
+`skills/agent-session-recording/SKILL.md` is the canonical **skill-first installation guide** and recording rule. The user shares this skill, the agent handles its own MCP setup as needed, and the agent verifies that `startRecording` supports `title` before saying setup succeeded. During browser/computer-use work it calls `startRecording(title="...")` before the first UI action and `finishRecording` before answering.
 
-The skill also requires a **recording summary** alongside the replay URL: the time span and duration, key steps, systems/accounts involved, changes made, human assistance such as 2FA, and errors or detours and their resolutions. Never include passwords, verification codes or key contents. The agent writes this summary from its own recorded actions; the MCP does not analyze the video.
+The skill also requires a **recording summary** alongside the ZIP replay URL and inside the ZIP as `summary.md`: the time span and duration, key steps, systems/accounts involved, changes made, human assistance such as 2FA, and errors or detours and their resolutions. Never include passwords, verification codes or key contents. The agent writes this summary from its own recorded actions; the MCP does not analyze the video.
 
 ## Development
 
@@ -157,6 +183,16 @@ python -m unittest discover -s tests -p "*Test.py" -v
 ```powershell
 python tests/Smoke.py --seconds 5 --delivery local --cleanup manual
 ```
+
+To exercise titled ZIP delivery on a real Linux X11 agent, run:
+
+```bash
+python tests/Smoke.py --seconds 5 --title zip-smoke-test --package zip --delivery ffl --cleanup after_download
+```
+
+Download the returned ZIP and confirm it contains the MP4 and `summary.md`.
+The MCP should delete both local files only after FFL reports the completed
+download. GitHub Actions runs the isolated unit suite, not this real X11/FFL test.
 
 Network share tests are not part of the default suite.
 

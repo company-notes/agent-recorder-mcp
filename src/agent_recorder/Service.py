@@ -14,6 +14,7 @@ import uuid
 
 from datetime import datetime
 
+from agent_recorder.Archive import RecordingArchive
 from agent_recorder.Capture import FfmpegFrameProbe, FfmpegLocator, X11GrabCapture
 from agent_recorder.Cleanup import AfterDownloadCleanup
 from agent_recorder.Delivery import DeliveryFactory, FFLDelivery, GoogleDriveDelivery, LocalDelivery
@@ -23,10 +24,12 @@ from agent_recorder.Models import (
     CleanupPolicy,
     DeliveryError,
     DeliveryKind,
+    PackageKind,
     RecorderError,
     Recording,
     RecordingNotFoundError,
     RecordingRequest,
+    RecordingTitle,
     RecordingState,
     UploadStatus,
 )
@@ -240,6 +243,23 @@ class RecordingService:
             raise DeliveryError("after_download cleanup requires ffl delivery.")
 
     @staticmethod
+    def _validatePackage(
+        package: PackageKind,
+        delivery: DeliveryKind,
+        summaryMarkdown: str | None,
+    ) -> None:
+        if package == PackageKind.VIDEO:
+            return
+
+        if package != PackageKind.ZIP:
+            raise DeliveryError("Unsupported recording package.")
+
+        if delivery != DeliveryKind.FFL:
+            raise DeliveryError("ZIP packaging currently requires ffl delivery.")
+
+        RecordingArchive.validateSummary(summaryMarkdown)
+
+    @staticmethod
     def _newId(startedAt: datetime) -> str:
         stamp = startedAt.strftime("%Y%m%d_%H%M%S")
         suffix = uuid.uuid4().hex[:6]
@@ -259,9 +279,16 @@ class RecordingService:
         fps: int,
         maxDurationSeconds: int,
         directory: pathlib.Path,
+        titleSlug: str | None,
     ) -> Recording:
         startedAt = self._clock.now()
         recordingId = self._newId(startedAt)
+        if titleSlug is None:
+            baseName = recordingId
+        else:
+            baseName = f"{startedAt.strftime('%Y-%m-%d_%H%M')}_{titleSlug}"
+
+        outputPath = RecordingFile.reserveMediaPath(directory, baseName)
         return Recording(
             recordingId=recordingId,
             state=RecordingState.RECORDING,
@@ -269,7 +296,7 @@ class RecordingService:
             fps=fps,
             startedAt=startedAt,
             maxDurationSeconds=maxDurationSeconds,
-            outputPath=directory / f"{recordingId}.mp4",
+            outputPath=outputPath,
             logPath=directory / f"{recordingId}.log",
             ffmpegPid=None,
             mcpPid=os.getpid(),
@@ -386,9 +413,11 @@ class RecordingService:
         fps: int = RecordingRequest.DEFAULT_FPS,
         maxDurationSeconds: int = RecordingRequest.DEFAULT_MAX_DURATION_SECONDS,
         outputDir: str | None = None,
+        title: str | None = None,
     ) -> StartResult:
         fps = RecordingRequest.fps(fps)
         maxDurationSeconds = RecordingRequest.maxDuration(maxDurationSeconds)
+        titleSlug = None if title is None else RecordingTitle.slug(title)
         with self._lock:
             active = self._activeRecording()
             if active is not None:
@@ -397,7 +426,7 @@ class RecordingService:
             directory = self._mediaDirectory(outputDir)
             self._capture.ensureAvailable()
             display = self._discovery.identify()
-            recording = self._create(display, fps, maxDurationSeconds, directory)
+            recording = self._create(display, fps, maxDurationSeconds, directory, titleSlug)
             try:
                 handle = self._capture.start(recording)
             except Exception:
@@ -425,8 +454,11 @@ class RecordingService:
         recordingId: str | None = None,
         delivery: DeliveryKind = DeliveryKind.FFL,
         cleanup: CleanupPolicy = CleanupPolicy.AFTER_DOWNLOAD,
+        package: PackageKind = PackageKind.VIDEO,
+        summaryMarkdown: str | None = None,
     ) -> Recording:
         self._validateFinish(delivery, cleanup)
+        self._validatePackage(package, delivery, summaryMarkdown)
         handle = None
         with self._lock:
             recording = self._resolve(recordingId)
@@ -451,6 +483,25 @@ class RecordingService:
         if recording.state == RecordingState.FINALIZING:
             self._stopHandle(recording, handle)
             self._ensurePlayable(recording)
+
+        if package == PackageKind.ZIP:
+            if recording.archivePath is None:
+                try:
+                    archivePath = RecordingArchive.create(recording.outputPath, summaryMarkdown)
+                except Exception as error:
+                    with self._lock:
+                        recording.state = RecordingState.READY
+                        recording.error = str(error)
+                        self._store.save(recording)
+                    raise
+
+                with self._lock:
+                    recording.archivePath = archivePath
+                    self._store.save(recording)
+            elif not recording.archivePath.is_file():
+                raise DeliveryError(f"Recording ZIP no longer exists: {recording.archivePath}")
+        elif recording.archivePath is not None:
+            raise DeliveryError("Recording is already packaged as ZIP. Retry with package='zip'.")
 
         with self._lock:
             if recording.state == RecordingState.FAILED:
@@ -516,6 +567,7 @@ class RecordingService:
         self._stopShareQuiet(recording)
         if deletePartial:
             RecordingFile.deleteMedia(recording)
+            RecordingFile.deleteArchive(recording)
             RecordingFile.deleteLog(recording)
 
         with self._lock:
@@ -581,6 +633,7 @@ class RecordingService:
         self._stopCaptureProcess(recording, handle)
         self._stopShareQuiet(recording)
         RecordingFile.deleteMedia(recording)
+        RecordingFile.deleteArchive(recording)
         RecordingFile.deleteLog(recording)
         with self._lock:
             recording.state = RecordingState.CLEANED

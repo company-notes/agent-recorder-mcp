@@ -14,25 +14,30 @@ from __future__ import annotations
 import argparse
 import time
 
-from agent_recorder.Models import CleanupPolicy, DeliveryKind
+from agent_recorder.Models import CleanupPolicy, DeliveryKind, PackageKind
 from agent_recorder.Service import buildDefaultService
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Record the agent display and finish.")
     parser.add_argument("--seconds", type=int, default=3)
+    parser.add_argument("--title", default="agent-recorder-smoke-test")
+    parser.add_argument("--package", choices=["video", "zip"], default="video")
+    parser.add_argument("--summary", default="# Smoke test\n\n1. Recorded the agent display.")
     parser.add_argument("--delivery", choices=["local", "ffl"], default="local")
     parser.add_argument("--cleanup", choices=["manual", "after_download"], default="manual")
     args = parser.parse_args()
 
     service = buildDefaultService()
-    started = service.start()
+    started = service.start(title=args.title)
     print(service.payloadFor(started.recording, alreadyRecording=started.alreadyRecording))
     time.sleep(args.seconds)
     finished = service.finish(
         started.recording.recordingId,
         DeliveryKind.parse(args.delivery),
         CleanupPolicy.parse(args.cleanup),
+        PackageKind.parse(args.package),
+        args.summary if args.package == "zip" else None,
     )
     print(service.payloadFor(finished))
 
