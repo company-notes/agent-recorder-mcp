@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import pathlib
+import unicodedata
 
 from datetime import datetime
 from enum import IntEnum
@@ -116,6 +117,31 @@ class RecordingRequest:
         return value
 
 
+class RecordingTitle:
+    """Convert a user-supplied title into a safe, short filename component."""
+
+    MAX_SLUG_LENGTH = 48
+
+    @classmethod
+    def slug(cls, title: str) -> str:
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError("title must be a non-empty string.")
+
+        normalized = unicodedata.normalize("NFKC", title).casefold()
+        characters = []
+        for character in normalized:
+            if character.isalnum():
+                characters.append(character)
+            elif characters and characters[-1] != "-":
+                characters.append("-")
+
+        slug = "".join(characters).strip("-")[:cls.MAX_SLUG_LENGTH].rstrip("-")
+        if not slug:
+            raise ValueError("title must contain at least one letter or digit.")
+
+        return slug
+
+
 class Recording:
     """One local capture and the delivery state attached to it."""
 
@@ -222,6 +248,7 @@ class Recording:
             "recordingId": self.recordingId,
             "state": self.state.name.lower(),
             "startedAt": self.startedAtText(),
+            "fileName": self.outputPath.name,
             "display": self.display,
             "fps": self.fps,
             "durationSeconds": self.durationSeconds(now),
