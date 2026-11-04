@@ -85,7 +85,7 @@ class ServiceTest(unittest.TestCase):
             service, store, delivery, _capture = openService(Path(directory))
             started = service.start(title="Github Login")
             videoPath = started.recording.outputPath
-            summary = "# Session summary\\n- Started at 17:30\\n- User completed 2FA."
+            summary = "# Session summary\n- Started at 17:30\n- User completed 2FA."
             finished = service.finish(
                 package=PackageKind.ZIP,
                 summaryMarkdown=summary,
@@ -99,7 +99,7 @@ class ServiceTest(unittest.TestCase):
             with zipfile.ZipFile(archivePath) as archive:
                 self.assertEqual(sorted(archive.namelist()), sorted([videoPath.name, "summary.md"]))
                 self.assertEqual(archive.read(videoPath.name), PLAYABLE_BYTES)
-                self.assertEqual(archive.read("summary.md").decode(), summary.replace("\\n", "\\n") + "\\n")
+                self.assertEqual(archive.read("summary.md").decode(), summary + "\n")
 
             reloaded = store.load(started.recording.recordingId)
             self.assertEqual(reloaded.archivePath, archivePath)
