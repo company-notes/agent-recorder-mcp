@@ -27,20 +27,20 @@ recording are not implemented.
    use them for this session and say if persistent skill installation is
    unavailable. Do not pretend reading a URL installs a skill.
 2. **Check the MCP tools and version compatibility.** Discover whether
-   `startRecording`, `recordingStatus` and `finishRecording` are available
-   **and whether `startRecording` supports the `title` argument**. If they
-   are compatible, skip connector installation. An older MCP without
-   `title` must be upgraded to the pinned version below, even if its
-   other tools work.
+   `startRecording`, `recordingStatus` and `finishRecording` are available,
+   whether `startRecording` supports `title`, and whether `finishRecording`
+   supports `package` and `summaryMarkdown`. If all checks pass, skip
+   connector installation. Otherwise, upgrade the MCP to the pinned version
+   below; merely finding older recording tools is not sufficient.
 3. **Identify the current agent and its connector setup method.** When the
    tools are missing, register the pinned `agent-recorder` MCP server using
    the appropriate method below. Perform supported tool/CLI/configuration
    actions yourself if permitted. Request approval when the client requires
    it. Do not ask the user to manually follow a command you can run.
 4. **Reload/reconnect if necessary.** Refresh MCP discovery (or restart the
-   client when required) and check that `startRecording` (with `title`),
-   `recordingStatus`, and `finishRecording` are available. Reading
-   a config file alone is not proof the MCP server is running.
+   client when required) and verify `startRecording(title=...)`,
+   `recordingStatus`, and `finishRecording(package=..., summaryMarkdown=...)`
+   are available. Reading a config file is not proof the tools are running.
 5. **Report the result.** Say whether the skill was installed/persisted,
    whether the MCP connector was registered, and whether its tools were
    verified. If you lack permission or cannot register a connector, provide
@@ -133,25 +133,36 @@ After the connector tools are verified:
    `maxDurationSeconds` only if requested. Default FFL sharing needs
    no custom `outputDir`.
 2. Perform the user's task on the agent's own browser/computer.
-3. Call `finishRecording` after the last UI action.
-4. Include the returned replay `url` in the final response, together with
-   a recording summary: the time span and duration, then a short numbered
-   list of what was done in the recording (key steps, accounts and systems
-   touched, anything created or changed, human help such as 2FA, and any
-   mistakes or detours and how they were fixed). Never put passwords,
-   codes or key contents in the summary.
-5. If recording fails, continue only if safe, and clearly state that no
-   replay was produced and why.
-6. Do not record tasks without browser/computer UI unless explicitly asked.
+3. After the final UI action, call `recordingStatus` and **write the
+   Markdown recording summary**. Include the recording time span and duration,
+   then a numbered list of key steps, systems and accounts touched, things
+   created or changed, user assistance such as 2FA, and errors or detours
+   plus how they were resolved. Never include passwords, verification codes,
+   API keys, private keys or other credential contents; do not invent actions.
+4. Call `finishRecording(package="zip", summaryMarkdown="...")` using the
+   **actual complete Markdown summary**, not the literal ellipsis. Keep the
+   default `delivery="ffl"` and `cleanup="after_download"`. The MCP first
+   finalizes the local MP4, then builds a same-stem ZIP named
+   `YYYY-MM-DD_HHMM_<title>.zip` containing that MP4 and `summary.md`.
+   Only after successful packaging does it start the FFL share. Do not
+   manually rename files, use a separate FFL MCP, or send video bytes in chat.
+5. Return the FFL ZIP `url` together with **the same summary** in the final
+   answer. After a completed download, the MCP deletes both local MP4 and ZIP.
+6. If the recording, ZIP creation or sharing fails, clearly explain that
+   no new replay was produced. Do not claim a link exists when none was
+   returned; keep recoverable files for an authorized retry.
+7. Do not record tasks without browser/computer UI unless explicitly asked.
 
 Do not read the video into the conversation. The model gets a replay link.
 For managed-sandbox synthetic DNS, FFL chooses a web relay automatically;
-otherwise it keeps its P2P-first behavior. FFL shares the named MP4 without
-renaming it, and the local file is deleted after the download completes.
+otherwise it keeps its P2P-first behavior. In ZIP mode, the original MP4 and
+ZIP stay local until FFL reports a completed download, when both are deleted.
+If nobody completes the download, both files are retained.
 
 ## Google Drive
 
-If the user requests Google Drive delivery and a Drive connector exists:
+If the user requests Google Drive delivery and a Drive connector exists,
+use the existing MP4 handoff instead of ZIP-over-FFL:
 
 1. Start with `startRecording(title="...", outputDir=...)` pointing to an existing
    directory the upload connector can read.
