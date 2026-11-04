@@ -55,6 +55,24 @@ class DeliveryTest(unittest.TestCase):
                 "2026-11-04_1408_github-login.mp4",
             )
 
+    def testFflSharesZipWhenArchiveExists(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            recording = sampleRecording(
+                root,
+                archivePath=root / "recordings" / "2026-11-04_1408_github-login.zip",
+            )
+            profile = FFLNetworkProfile(environ={"FFL_NETWORK_PROFILE": "p2p"})
+            result = FFLDelivery(_share, profile).deliver(recording)
+            self.assertEqual(
+                result.session.captured["path"],
+                str(recording.archivePath),
+            )
+            self.assertEqual(
+                result.session.captured["kwargs"]["name"],
+                "2026-11-04_1408_github-login.zip",
+            )
+
     def testFflShareWithoutALinkFails(self):
         with tempfile.TemporaryDirectory() as directory:
             recording = sampleRecording(Path(directory))
