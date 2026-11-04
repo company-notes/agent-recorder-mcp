@@ -41,6 +41,20 @@ class DeliveryTest(unittest.TestCase):
             self.assertEqual(result.session.captured["kwargs"], {"name": recording.outputPath.name})
             self.assertFalse(result.session.closed)
 
+    def testFflSharePassesTheTitledFilenameToTheReceiver(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outputPath = root / "recordings" / "2026-11-04_1408_github-login.mp4"
+            recording = sampleRecording(root, outputPath=outputPath)
+            profile = FFLNetworkProfile(environ={"FFL_NETWORK_PROFILE": "p2p"})
+            result = FFLDelivery(_share, profile).deliver(recording)
+
+            self.assertEqual(result.session.captured["path"], str(outputPath))
+            self.assertEqual(
+                result.session.captured["kwargs"]["name"],
+                "2026-11-04_1408_github-login.mp4",
+            )
+
     def testFflShareWithoutALinkFails(self):
         with tempfile.TemporaryDirectory() as directory:
             recording = sampleRecording(Path(directory))
