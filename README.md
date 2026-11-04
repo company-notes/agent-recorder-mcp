@@ -184,6 +184,16 @@ python -m unittest discover -s tests -p "*Test.py" -v
 python tests/Smoke.py --seconds 5 --delivery local --cleanup manual
 ```
 
+To exercise titled ZIP delivery on a real Linux X11 agent, run:
+
+```bash
+python tests/Smoke.py --seconds 5 --title zip-smoke-test --package zip --delivery ffl --cleanup after_download
+```
+
+Download the returned ZIP and confirm it contains the MP4 and `summary.md`.
+The MCP should delete both local files only after FFL reports the completed
+download. GitHub Actions runs the isolated unit suite, not this real X11/FFL test.
+
 Network share tests are not part of the default suite.
 
 ## Out of scope
