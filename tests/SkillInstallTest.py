@@ -23,7 +23,9 @@ class SkillInstallTest(unittest.TestCase):
         self.assertIn("recording summary: the time span and duration", text)
         self.assertIn("Never put passwords,", text)
         self.assertIn("the replay URL and its recording summary", text)
-        self.assertIn("v0.2.2", text)
+        self.assertIn("v0.2.3", text)
+        self.assertIn("startRecording(title=", text)
+        self.assertIn("YYYY-MM-DD_HHMM_", text)
 
     def testInstallCopiesOnceUnlessOverwriteIsSet(self):
         with tempfile.TemporaryDirectory() as directory:
