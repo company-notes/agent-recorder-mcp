@@ -28,6 +28,18 @@ class FilesTest(unittest.TestCase):
             path.write_bytes(b"ftyp" + (b"\x00" * RecordingFile.HEAD_BYTES) + b"moov")
             self.assertTrue(RecordingFile.isPlayable(path))
 
+    def testReserveMediaPathNeverOverwritesExistingFile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            original = root / "clip.mp4"
+            original.write_bytes(b"existing recording")
+            reserved = RecordingFile.reserveMediaPath(root, "clip")
+            self.assertEqual(reserved.name, "clip-2.mp4")
+            self.assertEqual(reserved.read_bytes(), b"")
+            self.assertEqual(original.read_bytes(), b"existing recording")
+            another = RecordingFile.reserveMediaPath(root, "clip")
+            self.assertEqual(another.name, "clip-3.mp4")
+
     def testDeleteMediaRemovesTheFileAndIgnoresAMissingOne(self):
         with tempfile.TemporaryDirectory() as directory:
             recording = sampleRecording(Path(directory))
