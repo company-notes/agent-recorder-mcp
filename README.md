@@ -99,8 +99,18 @@ The `fileName` field in the tool response identifies the actual MP4 name.
 For backward compatibility, omitting `title` still generates
 `rec_YYYYMMDD_HHMMSS_<id>.mp4`. The default folder is
 `<root>/recordings`; `outputDir` can select an existing writable folder.
-FFL shares the **same named MP4** and `after_download` cleanup still deletes
-it automatically once the download completes.
+The **recommended Skill workflow** calls
+`finishRecording(package="zip", summaryMarkdown="...")`, which first
+finalizes the local MP4, then creates a same-stem `YYYY-MM-DD_HHMM_title.zip`
+containing exactly that MP4 and `summary.md`. FFL shares **the ZIP**, not the
+original MP4. `after_download` deletes **both the ZIP and MP4** when the
+download completes. The `downloadFileName` field reports the shared ZIP name;
+`fileName` remains the original MP4 name.
+
+For backward compatibility, `finishRecording()` without `package="zip"`
+still shares the original MP4. ZIP packaging currently requires FFL and a
+non-empty `summaryMarkdown`; local or Google Drive delivery retains the
+existing MP4 behavior.
 
 ## Tools
 
@@ -108,14 +118,14 @@ it automatically once the download completes.
 | --- | --- |
 | `startRecording` | Select this agent's display and start FFmpeg. Defaults: 5 fps, 7200 seconds. Supply `title` to generate a descriptive MP4. Optional `outputDir` writes the file into an existing writable folder. |
 | `recordingStatus` | Duration, size, display, and state. `idle` when nothing is active. |
-| `finishRecording` | Stop, finalize, and hand the file to a transfer strategy. |
+| `finishRecording` | Finalize a recording. Use `package="zip"` with `summaryMarkdown` to share a ZIP containing the MP4 and `summary.md` through FFL; the default `package="video"` preserves legacy behavior. |
 | `confirmUpload` | Store the Google Drive link and apply `after_upload` cleanup. |
 | `abortRecording` | Stop without sharing. Deletes the partial file unless `deletePartial` is false. |
 | `cleanupRecording` | Delete one local recording by `recordingId` and stop its share. |
 
-`finishRecording` defaults to `delivery=ffl` and `cleanup=after_download`. `delivery=local` with `cleanup=manual` returns a `file:` URI and leaves the file in place. `delivery=google_drive` with `cleanup=after_upload` returns `localPath` for the assistant's Google Drive connector. Pass `outputDir` on `startRecording` as a folder that connector can read, such as `/workspace`. `confirmUpload` stores the Drive URL and then deletes that file.
+`finishRecording` defaults to `delivery=ffl` and `cleanup=after_download`. In ZIP mode, both the MP4 and the ZIP remain on disk until FFL's completed-download event triggers cleanup. `delivery=local` with `cleanup=manual` returns a `file:` URI and leaves the MP4 in place. `delivery=google_drive` with `cleanup=after_upload` returns `localPath` for the assistant's Google Drive connector. Pass `outputDir` on `startRecording` as a folder that connector can read, such as `/workspace`. `confirmUpload` stores the Drive URL and then deletes that file.
 
-A second `startRecording` while one recording is active returns that recording and sets `alreadyRecording` to true. Its existing filename is unchanged.
+A second `startRecording` while one recording is active returns that recording and sets `alreadyRecording` to true. Its existing filename is unchanged. The Skill must verify that `startRecording` exposes `title` **and** `finishRecording` exposes `package` and `summaryMarkdown`, upgrading an older MCP when needed.
 
 ## Display selection
 
@@ -156,7 +166,7 @@ Creating an FFL link does not delete the file. With `after_download`, the server
 
 `skills/agent-session-recording/SKILL.md` is the canonical **skill-first installation guide** and recording rule. The user shares this skill, the agent handles its own MCP setup as needed, and the agent verifies that `startRecording` supports `title` before saying setup succeeded. During browser/computer-use work it calls `startRecording(title="...")` before the first UI action and `finishRecording` before answering.
 
-The skill also requires a **recording summary** alongside the replay URL: the time span and duration, key steps, systems/accounts involved, changes made, human assistance such as 2FA, and errors or detours and their resolutions. Never include passwords, verification codes or key contents. The agent writes this summary from its own recorded actions; the MCP does not analyze the video.
+The skill also requires a **recording summary** alongside the ZIP replay URL and inside the ZIP as `summary.md`: the time span and duration, key steps, systems/accounts involved, changes made, human assistance such as 2FA, and errors or detours and their resolutions. Never include passwords, verification codes or key contents. The agent writes this summary from its own recorded actions; the MCP does not analyze the video.
 
 ## Development
 
