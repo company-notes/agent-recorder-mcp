@@ -56,6 +56,9 @@ class RecordingFile:
         for index in range(1, 1001):
             suffix = "" if index == 1 else f"-{index}"
             path = directory / f"{baseName}{suffix}.mp4"
+            if path.with_suffix(".zip").exists():
+                continue
+
             try:
                 with path.open("xb"):
                     pass
@@ -94,6 +97,18 @@ class RecordingFile:
             recording.outputPath.unlink(missing_ok=True)
         except OSError as error:
             logger.error("Could not delete recording %s: %s", recording.outputPath, error)
+            raise
+
+    @staticmethod
+    def deleteArchive(recording) -> None:
+        path = recording.archivePath
+        if path is None:
+            return
+
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as error:
+            logger.error("Could not delete recording archive %s: %s", path, error)
             raise
 
     @staticmethod
