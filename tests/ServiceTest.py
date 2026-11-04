@@ -108,6 +108,28 @@ class ServiceTest(unittest.TestCase):
             self.assertFalse(archivePath.exists())
             self.assertEqual(finished.state, RecordingState.CLEANED)
 
+    def testFflFailureRetainsArchiveAndAllowsRetry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, _store, delivery, _capture = openService(Path(directory))
+            started = service.start(title="Task")
+            summary = "# Summary"
+            with patch.object(delivery, "deliver", side_effect=DeliveryError("offline")):
+                with self.assertRaises(DeliveryError):
+                    service.finish(package=PackageKind.ZIP, summaryMarkdown=summary)
+
+            video = started.recording.outputPath
+            archive = video.with_suffix(".zip")
+            self.assertEqual(started.recording.state, RecordingState.READY)
+            self.assertTrue(video.exists())
+            self.assertTrue(archive.exists())
+
+            finished = service.finish(package=PackageKind.ZIP, summaryMarkdown=summary)
+            self.assertEqual(delivery.calls, [archive])
+            self.assertEqual(finished.archivePath, archive)
+            delivery.session.emitCompleted()
+            self.assertFalse(video.exists())
+            self.assertFalse(archive.exists())
+
     def testMissingZipSummaryFailsBeforeCaptureIsStopped(self):
         with tempfile.TemporaryDirectory() as directory:
             service, _store, _delivery, capture = openService(Path(directory))
