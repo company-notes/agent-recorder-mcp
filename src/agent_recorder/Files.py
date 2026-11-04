@@ -51,6 +51,22 @@ class RecordingFile:
     TAIL_BYTES = 4 * 1024 * 1024
 
     @staticmethod
+    def reserveMediaPath(directory: pathlib.Path, baseName: str) -> pathlib.Path:
+        """Atomically reserve a new MP4 path, never overwriting an existing file."""
+        for index in range(1, 1001):
+            suffix = "" if index == 1 else f"-{index}"
+            path = directory / f"{baseName}{suffix}.mp4"
+            try:
+                with path.open("xb"):
+                    pass
+            except FileExistsError:
+                continue
+
+            return path
+
+        raise RecorderError(f"Could not reserve a unique filename for {baseName}.")
+
+    @staticmethod
     def isPlayable(path: pathlib.Path) -> bool:
         try:
             if not path.is_file():
