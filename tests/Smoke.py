@@ -21,12 +21,13 @@ from agent_recorder.Service import buildDefaultService
 def main() -> None:
     parser = argparse.ArgumentParser(description="Record the agent display and finish.")
     parser.add_argument("--seconds", type=int, default=3)
+    parser.add_argument("--title", default="agent-recorder-smoke-test")
     parser.add_argument("--delivery", choices=["local", "ffl"], default="local")
     parser.add_argument("--cleanup", choices=["manual", "after_download"], default="manual")
     args = parser.parse_args()
 
     service = buildDefaultService()
-    started = service.start()
+    started = service.start(title=args.title)
     print(service.payloadFor(started.recording, alreadyRecording=started.alreadyRecording))
     time.sleep(args.seconds)
     finished = service.finish(
