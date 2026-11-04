@@ -12,6 +12,7 @@ from unittest.mock import patch
 from agent_recorder.Cleanup import AfterDownloadCleanup
 from agent_recorder.Delivery import DeliveryFactory, LocalDelivery
 from agent_recorder.Models import (
+    CaptureError,
     CleanupPolicy,
     DeliveryError,
     DeliveryKind,
@@ -114,7 +115,7 @@ class ServiceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             service, _store, _delivery, _capture = openService(root, capture=FakeCapture(failStart=True))
-            with self.assertRaises(Exception):
+            with self.assertRaises(CaptureError):
                 service.start(title="Failed start")
 
             self.assertFalse(list((root / "recordings").glob("*.mp4")))
