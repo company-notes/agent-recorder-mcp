@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import zipfile
 import tempfile
 import unittest
 from datetime import timedelta
@@ -16,6 +17,7 @@ from agent_recorder.Models import (
     CleanupPolicy,
     DeliveryError,
     DeliveryKind,
+    PackageKind,
     DisplayNotFoundError,
     FfmpegNotFoundError,
     RecorderError,
@@ -77,6 +79,72 @@ class ServiceTest(unittest.TestCase):
             delivery.session.emitCompleted()
             self.assertFalse(finished.outputPath.exists())
             self.assertEqual(finished.state, RecordingState.CLEANED)
+
+    def testZipDeliveryPreservesSummaryAndDeletesBothFilesAfterDownload(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, store, delivery, _capture = openService(Path(directory))
+            started = service.start(title="Github Login")
+            videoPath = started.recording.outputPath
+            summary = "# Session summary\\n- Started at 17:30\\n- User completed 2FA."
+            finished = service.finish(
+                package=PackageKind.ZIP,
+                summaryMarkdown=summary,
+            )
+            archivePath = videoPath.with_suffix(".zip")
+            self.assertEqual(finished.archivePath, archivePath)
+            self.assertEqual(delivery.calls, [archivePath])
+            self.assertTrue(videoPath.exists())
+            self.assertTrue(archivePath.exists())
+            self.assertEqual(service.payloadFor(finished)["downloadFileName"], archivePath.name)
+            with zipfile.ZipFile(archivePath) as archive:
+                self.assertEqual(sorted(archive.namelist()), sorted([videoPath.name, "summary.md"]))
+                self.assertEqual(archive.read(videoPath.name), PLAYABLE_BYTES)
+                self.assertEqual(archive.read("summary.md").decode(), summary.replace("\\n", "\\n") + "\\n")
+
+            reloaded = store.load(started.recording.recordingId)
+            self.assertEqual(reloaded.archivePath, archivePath)
+            delivery.session.emitCompleted()
+            self.assertFalse(videoPath.exists())
+            self.assertFalse(archivePath.exists())
+            self.assertEqual(finished.state, RecordingState.CLEANED)
+
+    def testMissingZipSummaryFailsBeforeCaptureIsStopped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, _store, _delivery, capture = openService(Path(directory))
+            started = service.start(title="Task")
+            for summary in (None, "", "  "):
+                with self.subTest(summary=summary), self.assertRaises(ValueError):
+                    service.finish(package=PackageKind.ZIP, summaryMarkdown=summary)
+
+            self.assertTrue(capture.handle.running)
+            self.assertFalse(started.recording.outputPath.with_suffix(".zip").exists())
+            service.abort()
+
+    def testZipCannotUseLocalOrGoogleDriveDelivery(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, _store, _delivery, capture = openService(Path(directory))
+            service.start(title="Task")
+            with self.assertRaises(DeliveryError):
+                service.finish(
+                    package=PackageKind.ZIP,
+                    delivery=DeliveryKind.LOCAL,
+                    cleanup=CleanupPolicy.MANUAL,
+                    summaryMarkdown="summary",
+                )
+
+            self.assertTrue(capture.handle.running)
+            service.abort()
+
+    def testExplicitCleanupDeletesArchiveAndOriginalVideo(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service, _store, _delivery, _capture = openService(Path(directory))
+            started = service.start(title="Task")
+            finished = service.finish(package=PackageKind.ZIP, summaryMarkdown="summary")
+            archive = finished.archivePath
+            video = finished.outputPath
+            service.cleanup(started.recording.recordingId)
+            self.assertFalse(video.exists())
+            self.assertFalse(archive.exists())
 
     def testSameTitleSameMinuteNeverOverwritesAnExistingFile(self):
         with tempfile.TemporaryDirectory() as directory:
