@@ -14,7 +14,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from agent_recorder.Models import CleanupPolicy, DeliveryKind, Recording, RecordingRequest
+from agent_recorder.Models import CleanupPolicy, DeliveryKind, PackageKind, Recording, RecordingRequest
 from agent_recorder.Service import RecordingService, buildDefaultService
 
 
@@ -102,6 +102,8 @@ def finishRecording(
     recordingId: str | None = None,
     delivery: str = "ffl",
     cleanup: str = "after_download",
+    package: str = "video",
+    summaryMarkdown: str | None = None,
 ) -> dict[str, Any]:
     """Stop the recording and hand it to a transfer strategy.
 
@@ -114,13 +116,25 @@ def finishRecording(
     returns localPath and uploadStatus pending. Upload that file with the
     connected Google Drive tool, then call confirmUpload with the Drive link.
 
-    Put the returned url in the final answer as the operation replay. If this call
-    fails, tell the user that no replay was produced and include the reason.
+    For the recommended Skill workflow, pass package="zip" and a non-empty
+    summaryMarkdown. The MCP first finalizes the named MP4 locally, builds a
+    same-stem ZIP containing the MP4 and summary.md, then shares the ZIP by FFL.
+    The ZIP and original MP4 remain local until a completed download triggers
+    after_download cleanup of both files. Do not put passwords, verification
+    codes or key contents in summaryMarkdown.
+
+    package="video" (the legacy default) continues sharing the MP4 directly;
+    ZIP packaging currently supports ffl delivery only.
+
+    Put the returned url in the final answer along with the summary. If this
+    call fails, explain that no new replay was produced and why.
     """
     recording = _service().finish(
         recordingId,
         DeliveryKind.parse(delivery),
         CleanupPolicy.parse(cleanup),
+        PackageKind.parse(package),
+        summaryMarkdown,
     )
     return _service().payloadFor(recording)
 
