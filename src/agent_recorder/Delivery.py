@@ -37,9 +37,10 @@ class FFLDelivery(DeliveryStrategy):
         self._networkProfile = FFLNetworkProfile() if networkProfile is None else networkProfile
 
     def deliver(self, recording) -> DeliveryResult:
+        sharePath = recording.sharePath()
         session = self._shareFunction(
-            str(recording.outputPath),
-            name=recording.outputPath.name,
+            str(sharePath),
+            name=sharePath.name,
             **self._networkProfile.shareOptions(),
         )
         url = getattr(session, "link", None)
